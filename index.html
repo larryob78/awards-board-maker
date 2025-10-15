@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Awards Board Maker</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Load external libraries for export functionality. These will be fetched when the page runs on the Internet. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>Awards Board Maker</h1>
+    </header>
+    <main>
+      <aside class="controls">
+        <h2>Board Settings</h2>
+        <div class="field">
+          <label for="board-select">Select Board:</label>
+          <select id="board-select"></select>
+        </div>
+        <div class="field">
+          <label for="key-image">Key Image:</label>
+          <input type="file" id="key-image" accept="image/*">
+        </div>
+        <div class="field">
+          <label for="logo-image">Logo:</label>
+          <input type="file" id="logo-image" accept="image/*">
+        </div>
+        <div class="field">
+          <label for="font-file">Brand Font (.ttf/.otf):</label>
+          <input type="file" id="font-file" accept=".ttf,.otf">
+        </div>
+        <div class="field">
+          <label for="brief">Brief:</label>
+          <textarea id="brief" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="insight">Insight:</label>
+          <textarea id="insight" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="idea">Idea:</label>
+          <textarea id="idea" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="execution">Execution:</label>
+          <textarea id="execution" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="results">Results:</label>
+          <textarea id="results" rows="3"></textarea>
+        </div>
+        <div class="buttons">
+          <button id="add-board">Add Board</button>
+          <button id="remove-board">Remove Board</button>
+          <button id="export-pdf">Export PDF</button>
+          <button id="export-png">Export PNG</button>
+        </div>
+      </aside>
+      <section class="preview" id="preview"></section>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
