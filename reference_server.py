@@ -14,12 +14,15 @@ import re
 import ssl
 import threading
 import unicodedata
+import uuid
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from PIL import Image, ImageOps
 import certifi
+from design_engine import create_board, library, validate_input
+from writing_engine import refine_copy
 
 ROOT = Path(__file__).resolve().parent
 STOP = set('a an and are as at be by for from in is it of on or the this to with'.split())
@@ -238,10 +241,19 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         corpus = self.server.corpus
         if path == '/api/status':
+            learned = library(corpus.config)
             return self.send_data(200, {'campaigns': len(corpus.records), 'images': corpus.image_count,
                                        'descriptions': corpus.text_count, 'label': corpus.config.get('source_label', 'Reference boards'),
                                        'retrieval': 'Keyword search over campaign metadata and available descriptions',
-                                       'ai_available': bool(api_key(corpus.config))})
+                                       'ai_available': bool(api_key(corpus.config)),
+                                       'learning': learned.get('coverage', {}), 'principle_count': len(learned.get('principles', []))})
+        download = re.fullmatch(r'/api/download/([a-f0-9]{32})\.(png|pdf|json)', path)
+        if download:
+            saved = ROOT / 'reference-data' / 'exports' / f'{download[1]}.{download[2]}'
+            if saved.is_file():
+                mime = {'png': 'image/png', 'pdf': 'application/pdf', 'json': 'application/octet-stream'}[download[2]]
+                return self.send_data(200, saved.read_bytes(), mime)
+            return self.send_data(404, {'error': 'Saved file not found.'})
         match = re.fullmatch(r'/api/boards/(\d+)/(thumbnail|image)', path)
         if match and match[1] in corpus.records:
             try:
@@ -251,6 +263,9 @@ class Handler(BaseHTTPRequestHandler):
         assets = {'/': ('index.html', 'text/html; charset=utf-8'), '/index.html': ('index.html', 'text/html; charset=utf-8'),
                   '/style.css': ('style.css', 'text/css'), '/script.js': ('script.js', 'text/javascript'),
                   '/references.js': ('references.js', 'text/javascript')}
+        assets.update({'/studio.js': ('studio.js', 'text/javascript'), '/studio.css': ('studio.css', 'text/css'),
+                       '/typography.js': ('typography.js', 'text/javascript'),
+                       '/classic': ('classic.html', 'text/html; charset=utf-8')})
         if path in assets:
             filename, mime = assets[path]
             return self.send_data(200, (ROOT / filename).read_bytes(), mime)
@@ -261,11 +276,59 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_data(403, {'error': 'Local JSON requests only.'})
         try:
             length = int(self.headers.get('Content-Length', '0'))
-            if not 0 < length <= 40000:
+            maximum = 30_000_000 if self.path == '/api/export' else 40000
+            if not 0 < length <= maximum:
                 raise ValueError('Request is too large or empty.')
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
                 raise ValueError('Expected a JSON object.')
+            if self.path == '/api/export':
+                kind = data.get('format')
+                encoded = data.get('data')
+                if not isinstance(kind, str) or kind not in {'png', 'pdf', 'json'} or not isinstance(encoded, str):
+                    raise ValueError('Invalid export format.')
+                try:
+                    payload = base64.b64decode(encoded, validate=True)
+                except ValueError:
+                    raise ValueError('Invalid export data.') from None
+                if not payload or len(payload) > 20_000_000:
+                    raise ValueError('Export must be under 20 MB.')
+                if kind == 'png' and not payload.startswith(b'\x89PNG\r\n\x1a\n'):
+                    raise ValueError('Invalid PNG file.')
+                if kind == 'png':
+                    try:
+                        with Image.open(io.BytesIO(payload)) as exported:
+                            if exported.format != 'PNG' or exported.width * exported.height > 40_000_000:
+                                raise ValueError('Invalid PNG dimensions.')
+                            exported.verify()
+                    except (OSError, Image.DecompressionBombError):
+                        raise ValueError('Invalid PNG file.') from None
+                if kind == 'pdf' and (not payload.startswith(b'%PDF-') or b'%%EOF' not in payload[-1024:]):
+                    raise ValueError('Invalid PDF file.')
+                if kind == 'json':
+                    project = json.loads(payload)
+                    if not isinstance(project, dict) or project.get('format') != 'awards-board-studio-v1':
+                        raise ValueError('Invalid project file.')
+                directory = ROOT / 'reference-data' / 'exports'
+                directory.mkdir(parents=True, exist_ok=True)
+                name = f'{uuid.uuid4().hex}.{kind}'
+                (directory / name).write_bytes(payload)
+                return self.send_data(200, {'url': f'/api/download/{name}', 'filename': f'awards-board.{kind}'})
+            if self.path == '/api/create-board':
+                validate_input(data)
+                if not self.server.generation_lock.acquire(blocking=False):
+                    return self.send_data(429, {'error': 'A board is already being designed. Please wait.'})
+                try:
+                    return self.send_data(200, create_board(self.server.corpus, data, api_key(self.server.corpus.config)))
+                finally:
+                    self.server.generation_lock.release()
+            if self.path == '/api/refine-copy':
+                if not self.server.generation_lock.acquire(blocking=False):
+                    return self.send_data(429, {'error': 'The assistant is already working. Please wait.'})
+                try:
+                    return self.send_data(200, refine_copy(self.server.corpus, data, api_key(self.server.corpus.config)))
+                finally:
+                    self.server.generation_lock.release()
             if self.path == '/api/search':
                 query = data.get('query')
                 if not isinstance(query, str) or not 1 <= len(query.strip()) <= 500:

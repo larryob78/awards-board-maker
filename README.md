@@ -1,74 +1,76 @@
-# Awards Board Maker
+# Awards Board Studio
 
-This project provides a simple web‑based tool to design **A2 landscape award boards** for creative festivals such as the Cannes Lions. Each board includes a key image, a logo, and copy for the brief, insight, idea, execution and results. You can create multiple boards, preview them live, and export them as a single PDF or individual PNG files.
+A local, principle-led design and writing assistant for awards case boards. Describe your campaign, add optional artwork, generate a designed draft, then refine and review it. Reference boards inform the assistant behind the scenes; the main workflow does not ask users to browse or select them.
 
-## Features
+## What is implemented
 
-* **Multiple boards** – Add or remove boards and switch between them from the dropdown selector.
-* **Live preview** – Changes to images, text or fonts update the preview immediately.
-* **Image uploads** – Upload a key image and logo for each board (supports any image format your browser can display).
-* **Custom fonts** – Upload a `.ttf` or `.otf` file to apply your brand font to the board copy. The font is embedded via a data URI and applied only to the board you are editing.
-* **Export** – Export all boards into a multi‑page PDF (landscape A4 by default) or export the current board as a standalone PNG file. The PDF export uses [`html2canvas`](https://html2canvas.hertzen.com/) and [`jsPDF`](https://github.com/parallax/jsPDF) loaded from a CDN at runtime.
+- **AI board generation:** grounded campaign copy and a recommended layout, automatically typeset into an editable board. Missing information is flagged. A failed response check gets at most one automatic correction attempt before returning an error. Results are copied verbatim from the supplied results field, never manufactured by the generator.
+- **Three layout treatments:** Editorial, Bold and Story, with one-click switching, image framing/focus, a brand accent and an optional logo.
+- **Typography studio:** Editorial, Modern, Compact and Humanist type systems; coordinated display/body roles; automatic kerning and ligatures; headline fitting; adjustable type size, leading, tracking and section spacing. Uploaded brand fonts are supported. Body text has a readable-size floor; overflow produces a warning and blocks export rather than silently disappearing.
+- **Writing assistant:** sharpen, shorten or clarify headlines, supporting lines, insights, ideas, execution and results. Each suggestion has exact supporting campaign excerpts and accept/reject controls. Accepted changes can be undone if no subsequent edit conflicts. Insights are interpretations requiring review. Results edits require explicit verification and can only retain, drop or reorder complete supplied sentences or bullets.
+- **Review and history:** generated copy/layout versions, original brief snapshots, applied principles, source provenance and writing events. Campaign images, logo and uploaded font are currently shared across draft versions. Review resets after editing or reopening a project. Unapproved exports retain a draft watermark.
+- **Local saving:** autosave in this browser; save/open project JSON; image and font assets stay local. Saved project and export files are stored under ignored `reference-data/exports/`, with a download link for a separate copy. Browser storage can fill with large assets; save a project file when prompted.
+- **Exports:** PNG and raster A2 landscape PDF. The export canvas is 7000 × 4950 pixels, approximately 300 dpi at A2. Source-image resolution still limits image detail; PDF text is rasterized, not editable/vector type. Files must be under 20 MB.
 
-## Usage
+## Run
 
-1. Open `index.html` in a modern web browser.
-2. Use the **Board Settings** sidebar to add a new board or select an existing one from the dropdown.
-3. Upload your **Key Image**, **Logo**, and **Brand Font** (optional) using the file inputs.
-4. Type your copy for **Brief**, **Insight**, **Idea**, **Execution** and **Results** in the respective text areas.
-5. Repeat steps 2–4 for each board you wish to create.
-6. Click **Export PDF** to download all boards as a single PDF file, or click **Export PNG** to download the currently selected board as a PNG image.
-
-## Development
-
-The project is pure HTML/CSS/JavaScript. To modify the layout or behaviour:
-
-* `index.html` – The page structure and external script/style imports.
-* `style.css` – Layout, typography and responsive styles. A CSS variable `--custom-font` is set dynamically to apply uploaded fonts.
-* `script.js` – Manages board state, file uploads, live preview updates and export routines. Font files are embedded via a generated `@font-face` rule and applied per‑board using a unique font name.
-
-No build step is required. Simply edit the files and refresh the page to see your changes.
-
-## Reference boards and RAG guidance
-
-The optional local reference server adds a searchable image collection and Gemini-powered design guidance. It retrieves campaign examples, sends up to three selected board images with the current campaign text to Gemini, and returns suggestions with checked reference IDs. Guidance is advisory and never overwrites the editor. Download it with its sources and input snapshot using **Save guidance with sources**.
-
-### Run locally
-
-Requires Python 3.10 or later:
+Requires Python 3.10+ and a modern browser. No frontend build step.
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 cp references.example.json references.local.json
-# Edit references.local.json to point to your existing files.
-python3 reference_server.py
+# Edit the local configuration to reference your existing private files.
+python3 reference_server.py --port 8766
 ```
 
-Open http://127.0.0.1:8766/. The existing static editor still works without this server, but reference retrieval needs the server. Keep the server running while using the reference panel. Restart it after changing the collection or configuration.
+Open http://127.0.0.1:8766/. Keep the server running. `--port` can be changed. The previous manual editor is preserved at `/classic`; Studio is the default page. A static file host alone cannot run AI or local saving.
 
-Configuration:
+### Private configuration
 
-- `board_dir`: folder of JPG images named `YEAR_CAMPAIGNID_Title.jpg`. Extra copies of a campaign are grouped into one search result. Files outside this naming pattern are skipped; originals are never modified.
-- `metadata_csv` (optional): CSV with `id`, `title`, `brand`, `agency`, `campaignUrl`, `highestAward`. IDs must identify the same campaigns as the image filenames.
-- `campaign_json` (optional): JSON list with `title`, `year`, `sections`, `ogDesc`, `url`. Descriptions join only on an unambiguous normalized title plus year, because entry IDs may differ from campaign IDs. Ambiguous matches are omitted.
-- `source_label`: friendly collection name. `drive_folder_url` is an optional provenance note only; this version reads local files and does not sync Drive.
-- `model`: Gemini model ID, default `gemini-3.6-flash`.
-- For AI guidance, set `GOOGLE_API_KEY` or `GEMINI_API_KEY` in the server environment. Alternatively, set `credentials_file` to an existing private dotenv file containing one of those variables. Do not paste keys into JSON or client code. A configured key does not guarantee provider access or available quota.
+- `board_dir`: existing JPG collection, named `YEAR_CAMPAIGNID_Title.jpg`. Duplicate campaign images become one retrieval record; originals are never modified.
+- `metadata_csv`: optional campaign metadata with `id`, `title`, `brand`, `agency`, `campaignUrl`, `highestAward` and available award counts.
+- `campaign_json`: optional list of richer entries with `title`, `year`, `sections`, `ogDesc`, `url`, `awardLevel`. Description joins are deliberately conservative where entry and campaign identifiers differ.
+- `source_label`: friendly corpus name. `drive_folder_url` is a provenance note only, not a Drive sync connection.
+- `model`: provider model ID, currently `gemini-3.6-flash` in the verified local setup.
+- `principles_file`: optional path to the learned private library; defaults to `reference-data/principles.json`.
+- Set `GOOGLE_API_KEY` or `GEMINI_API_KEY` in the server environment. Alternatively, `credentials_file` may point to an existing private dotenv file with one of those variables. Never put a key in client code or committed JSON.
 
-Search uses BM25 keyword ranking across campaign metadata and available descriptions, with additional title and brand weight. It does not perform semantic vector retrieval or OCR across the image collection. Selected images are analysed visually during generation. Missing descriptions are labelled, no-match queries stay empty, and every result exposes its local image and available campaign/description source links. These sources are reference evidence, not verified claims about the user's campaign.
+## Learn from the collection
 
-Privacy: the server binds only to loopback, rejects other origins/hosts, and serves an explicit asset allowlist. Private configuration, reference images, metadata and credentials are excluded from Git. Search remains local. Clicking **Get design guidance** sends current board text, the design request and up to three selected reference images/descriptions to Google's Gemini API. This may incur provider charges. Only responses whose cited IDs belong to the selected set are displayed. Citation validation checks provenance IDs, not whether every model interpretation is accurate.
+```sh
+python3 learn_principles.py --sample-size 16
+```
 
-Limits: this is a local prototype, not an authenticated hosted service. The editor and reference selections are held in browser memory; export/save what you need before closing or refreshing. Do not expose this server publicly. The existing layout and export behaviour are unchanged; suggestions do not automatically restyle the board. Corpus files and keys must be configured separately on another computer.
+The learner scans every JPG locally for dimensions, brightness, saturation, image entropy and edge density. A cached scan is reused when file size/mtime signatures match. These are pixel measurements, not semantic reviews or scores of design quality.
 
-### Verify
+It then sends a bounded sample of images to Gemini for reusable typography, layout, writing and evidence principles. Deterministic sampling mixes visual variation and award cohorts, favouring Grand Prix/Titanium and Gold while retaining Silver, Bronze, shortlist and uncertain metadata comparisons. Richer award evidence is reconciled only with exact IDs or unambiguous campaign title/year matches. Medal metadata remains incomplete; an award is a campaign honour, not proof that a board's design caused success.
+
+Every learned principle has a rule, visible observation, conditions, pitfalls and checked sample citations. The library is saved atomically only after validation and remains private. No model weights are fine-tuned. This is a reusable principle library applied through prompts and deterministic typography/layout rules.
+
+Verified local learning pass, 19 September 2026: **6,905 readable JPGs scanned, 6,302 campaigns indexed, 16 boards visually reviewed by AI**. The final sample includes 4 Grand Prix/Titanium, 4 Gold, 3 Silver, 2 Bronze, 2 shortlist and 1 unknown. It produced 12 learned rules plus 6 editorial safeguards. This is not a visual analysis of all 6,302 campaigns. Another checkout needs its own private data and learning pass; otherwise generation uses the editorial foundation rules with honest zero learning counts.
+
+During board generation, BM25 keyword retrieval also selects up to three relevant reference images automatically. The model uses them for visual hierarchy only; it never places their art in the user's board. Writing retrieval uses up to four relevant available descriptions, with modest award weighting and original-copy guards. Retrieval is keyword-based, not semantic vector search or corpus-wide OCR.
+
+## Evidence and privacy
+
+The local server binds to loopback, restricts host/origin, bounds requests, verifies file formats and serves an explicit allowlist. It does not serve configuration, source Python, `.git`, private corpus files or directory listings. Do not expose this prototype publicly. Learning and generation use Google Gemini and may incur API charges. Generation sends the submitted brief and selected style references; the writing assistant sends campaign facts and selected description excerpts. Uploaded user images, logos and fonts are used locally by the renderer and do not go to the model.
+
+Exact excerpts, valid reference IDs and numerical guards provide traceability, not proof that every AI interpretation is true. Human review is required. Confirm campaign facts, wording, visual rights, brand requirements and the applicable festival specification. The app does not verify awards eligibility or guarantee a world-class result. Output quality still depends on source facts, assets and review.
+
+Private reference images, data, credentials, projects and exports are excluded from Git. The collection is read in place; it is not copied into the public repository. The server retains local saved files until the user manages them; there is no cloud account system, shared project database or automatic background learning.
+
+## Verification
 
 ```sh
 python3 -m unittest discover -s tests -v
+node --check studio.js
+node --check typography.js
 ```
 
-Tests cover deduplication, metadata provenance, ambiguous joins, ranking, empty results, image bounds, private-file protection, invalid generation requests and rejected citations. They use temporary synthetic data and do not call paid APIs. For a live smoke test, search for a known campaign, inspect its image and source, select it, enter a short sample brief, and request guidance. Check citations and that the editor text stays unchanged. Also confirm ordinary editing, switching boards and exports in your browser.
+Tests use synthetic temporary data and mocked provider calls. They cover source/award joins, sample diversity/provenance, type/length validation, unknown sections, unsupported numeric units, exact campaign excerpts, interpretation status, result-preservation, writing proposal safety, local origin/private-file protection and export roundtrips.
+
+Live verification must additionally exercise generation, writing accept/undo, the three layouts and typography presets, image/font uploads, autosave/reopening, and PNG/PDF output at desktop and mobile widths. Fitting and expert aesthetic judgement are different checks: readable, unclipped text does not establish that the composition is award-worthy. For product release, compare representative real campaigns with a senior designer's assessment of hierarchy, typography, storytelling, evidence and brand fit, and retain revision feedback.
 
 Provider reference: [Gemini generateContent API](https://ai.google.dev/api/generate-content).
