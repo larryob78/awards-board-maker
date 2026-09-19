@@ -4,5 +4,7 @@
   "campaign_json": "/path/to/cannes-master-consolidated.json",
   "source_label": "Cannes reference boards",
   "drive_folder_url": "",
-  "model": "gemini-3.6-flash"
+  "model": "gemini-3.6-flash",
+  "runway_secret_ref": "op://YOUR_VAULT_ID/YOUR_RUNWAY_ITEM_ID/YOUR_API_KEY_FIELD_ID",
+  "runway_account": "napkin.1password.eu"
 }

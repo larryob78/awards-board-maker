@@ -23,6 +23,7 @@ from PIL import Image, ImageOps
 import certifi
 from design_engine import create_board, library, validate_input
 from writing_engine import refine_copy
+from image_engine import ImageJobs, MODEL as IMAGE_MODEL, configured as image_configured
 
 ROOT = Path(__file__).resolve().parent
 STOP = set('a an and are as at be by for from in is it of on or the this to with'.split())
@@ -212,6 +213,7 @@ class ReferenceServer(ThreadingHTTPServer):
         super().__init__(address, Handler)
         self.corpus = corpus
         self.generation_lock = threading.Lock()
+        self.image_jobs = ImageJobs(corpus.config, ROOT / "reference-data" / "image-jobs")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -246,7 +248,18 @@ class Handler(BaseHTTPRequestHandler):
                                        'descriptions': corpus.text_count, 'label': corpus.config.get('source_label', 'Reference boards'),
                                        'retrieval': 'Keyword search over campaign metadata and available descriptions',
                                        'ai_available': bool(api_key(corpus.config)),
+                                       'image_model': IMAGE_MODEL, 'image_configured': image_configured(corpus.config),
                                        'learning': learned.get('coverage', {}), 'principle_count': len(learned.get('principles', []))})
+        image_job = re.fullmatch(r'/api/image-jobs/([a-f0-9]{32})', path)
+        if image_job:
+            try:
+                return self.send_data(200, self.server.image_jobs.status(image_job[1]))
+            except ValueError as error:
+                return self.send_data(404, {'error': str(error)})
+            except RuntimeError as error:
+                return self.send_data(502, {'error': str(error)})
+            except Exception:
+                return self.send_data(502, {'error': 'Image status unavailable. Your task is retained.'})
         download = re.fullmatch(r'/api/download/([a-f0-9]{32})\.(png|pdf|json)', path)
         if download:
             saved = ROOT / 'reference-data' / 'exports' / f'{download[1]}.{download[2]}'
@@ -314,6 +327,8 @@ class Handler(BaseHTTPRequestHandler):
                 name = f'{uuid.uuid4().hex}.{kind}'
                 (directory / name).write_bytes(payload)
                 return self.send_data(200, {'url': f'/api/download/{name}', 'filename': f'awards-board.{kind}'})
+            if self.path == '/api/create-image':
+                return self.send_data(200, self.server.image_jobs.create(data))
             if self.path == '/api/create-board':
                 validate_input(data)
                 if not self.server.generation_lock.acquire(blocking=False):

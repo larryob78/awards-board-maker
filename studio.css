@@ -101,3 +101,5 @@
   .typography-controls { grid-template-columns: 1fr; }
 }
 .type-panel,.writing-panel{border-bottom:1px solid #c7d0c0;padding:12px 0 22px}.writing-panel>p{margin-top:14px}.writing-controls{display:grid;grid-template-columns:1fr 1fr;gap:16px}.writing-panel .approval{font-size:12px;display:flex;gap:9px;align-items:center;line-height:1.5}.writing-panel button{margin-right:12px}.writing-panel textarea{font-size:13px}#writing-proposal{background:#f8faf4;border-left:3px solid #608150;padding:20px;margin-top:15px}#proposed-copy{font-size:18px;color:#223422;white-space:pre-wrap}#writing-evidence{font-size:12px;color:#52604d;padding-left:18px;line-height:1.6}[data-state=warning]{color:#8b421d!important}.typography-controls input[type=range]{padding:0;accent-color:#264b39}
+
+.art-visual{position:relative}.art-generated{position:absolute;bottom:12px;left:12px;padding:6px 10px;background:#14231c;color:#fff;font:500 13px Arial,sans-serif;letter-spacing:.04em}

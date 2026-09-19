@@ -69,6 +69,7 @@
     const content=node('div',undefined,'art-content');const visual=node('div',undefined,'art-visual');
     if(state.hero){const img=node('img');img.src=state.hero;img.alt='Your campaign image';visual.append(img);}
     else {const letters=(draft.brand||draft.campaign||'IDEA').split(/\s+/).map(v=>v[0]).join('').slice(0,3).toUpperCase();visual.append(node('div',letters,'art-wordmark'));}
+    if(state.hero&&state.heroSource?.kind==='generated')visual.append(node('span','AI concept image','art-generated'));
     const text=node('div',undefined,'art-text');const heading=node('div',undefined,'art-heading');heading.append(node('h1',draft.headline,'art-headline'),node('p',draft.subhead,'art-subhead'));text.append(heading);
     ['insight','idea','execution'].forEach(field=>{const section=node('section',undefined,'art-section');section.append(node('h3',field==='insight'&&!version.approved?'Suggested insight':LABELS[field]),node('p',draft[field]));text.append(section);});
     const proof=node('section',undefined,`art-proof${draft.results?'':' missing'}`);proof.append(node('h3','Results'),node('p',draft.results||'Results to be confirmed.'));text.append(proof);content.append(visual,text);art.append(content);
@@ -93,7 +94,7 @@
     const draft=current().draft;$('design-rationale').textContent=draft.rationale;
     $('applied-principles').replaceChildren(...draft.applied_principles.map(p=>node('li',p.rule)));
     const evidence=$('campaign-evidence');evidence.replaceChildren(...['context','insight','idea','execution'].map(field=>node('li',`${LABELS[field]} · ${field==='insight'?'Interpretation for review':'AI wording from your brief'}: “${draft.support?.[field]||'No supporting detail supplied'}”`)));
-    const gaps=[...draft.missing];if(!draft.results)gaps.push('Add supported results when they are available.');if(!state.hero)gaps.push('This is a typography-led draft. Add your own campaign image for more visual evidence.');
+    const gaps=[...draft.missing];if(state.heroSource?.kind==='generated')gaps.push('AI-generated concept image: do not present it as proof of real campaign execution.');if(!draft.results)gaps.push('Add supported results when they are available.');if(!state.hero)gaps.push('This is a typography-led draft. Add your own campaign image for more visual evidence.');
     $('review-gaps').replaceChildren(...[...new Set(gaps)].map(text=>node('li',text)));
   }
   function buildEditor() {
@@ -109,8 +110,8 @@
   }
   async function fileData(file) { return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the selected file.'));reader.readAsDataURL(file);}); }
   for(const name of ['hero','logo']){
-    $(`${name}-upload`).addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8_000_000)throw new Error('Choose a PNG, JPG or WebP image under 8 MB.');const data=await fileData(file);const img=new Image();img.src=data;await img.decode();if(img.width*img.height>40_000_000)throw new Error('Choose an image smaller than 40 megapixels.');state[name]=data;if(current())current().approved=false;$(`remove-${name}`).hidden=false;renderBoard();if(current())showReview();persist();}catch(error){$('save-status').textContent=error.message;}});
-    $(`remove-${name}`).addEventListener('click',()=>{state[name]='';$(`${name}-upload`).value='';$(`remove-${name}`).hidden=true;if(current())current().approved=false;renderBoard();if(current())showReview();persist();});
+    $(`${name}-upload`).addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8_000_000)throw new Error('Choose a PNG, JPG or WebP image under 8 MB.');const data=await fileData(file);const img=new Image();img.src=data;await img.decode();if(img.width*img.height>40_000_000)throw new Error('Choose an image smaller than 40 megapixels.');state[name]=data;if(name==='hero')state.heroSource=null;if(current())current().approved=false;$(`remove-${name}`).hidden=false;renderBoard();if(current())showReview();persist();}catch(error){$('save-status').textContent=error.message;}});
+    $(`remove-${name}`).addEventListener('click',()=>{state[name]='';if(name==='hero')state.heroSource=null;$(`${name}-upload`).value='';$(`remove-${name}`).hidden=true;if(current())current().approved=false;renderBoard();if(current())showReview();persist();});
   }
   INPUTS.forEach(id=>$(id).addEventListener('input',()=>{scheduleSave();if(id==='color'&&current()){current().draft.color=$('color').value;current().approved=false;renderBoard();}}));
   $('brief-form').addEventListener('submit',async event=>{
@@ -141,8 +142,51 @@
   $('apply-writing').addEventListener('click',()=>{if(!writeProposal)return;const {proposal,version,original}=writeProposal;if(current()!==version||version.draft[proposal.field]!==original){$('writing-status').textContent='This wording changed while the assistant was working. Request a fresh suggestion to keep your edits.';return;}version.draft[proposal.field]=proposal.proposed_text;version.approved=false;version.writing_history??=[];version.writing_events??=[];version.writing_events.push({field:proposal.field,action:'accepted',at:new Date().toISOString()});version.writing_history.push({field:proposal.field,before:original,after:proposal.proposed_text,evidence:proposal.evidence,action:'accepted',at:new Date().toISOString()});renderBoard();buildEditor();showReview();persist();$('writing-proposal').hidden=true;$('writing-status').textContent='Suggested wording applied. You can edit it further or restore the previous wording.';});
   $('reject-writing').addEventListener('click',()=>{if(writeProposal){writeProposal.version.writing_events??=[];writeProposal.version.writing_events.push({field:writeProposal.proposal.field,action:'rejected',at:new Date().toISOString()});persist();}$('writing-proposal').hidden=true;writeProposal=null;$('writing-status').textContent='Kept your existing wording.';});
   $('undo-writing').addEventListener('click',()=>{const version=current();const last=version?.writing_history?.at(-1);if(!last){$('writing-status').textContent='No accepted writing suggestion to undo.';return;}if(version.draft[last.field]!==last.after){$('writing-status').textContent='You edited this wording after applying the suggestion. Your newer changes are kept.';return;}version.draft[last.field]=last.before;version.writing_history.pop();version.approved=false;renderBoard();buildEditor();persist();$('writing-status').textContent='Previous wording restored.';});
+  let imageProposal=null, imageBusy=false;
+  const IMAGE_JOB='awards-board-image-job';
+  function imageReceipt(id){try{localStorage.setItem(IMAGE_JOB,id);}catch{throw new Error('Browser storage is full. Save your project and free space before generating.');}}
+  async function watchImage(id){
+    imageBusy=true;$('create-image').disabled=true;$('resume-image').hidden=false;$('resume-image').disabled=true;
+    try{
+      for(let attempt=0;attempt<120;attempt++){
+        const job=await api(`/api/image-jobs/${id}`);
+        if(job.status==='SUCCEEDED'){
+          if(!safeImage(job.image))throw new Error('Unsupported generated image. Your board is unchanged.');
+          imageProposal=job;$('generated-image').src=job.image;$('image-proposal').hidden=false;
+          $('image-status').textContent='Your image is ready to review. Your current board is unchanged.';return;
+        }
+        if(['FAILED','CANCELED','UNCONFIRMED'].includes(job.status)){ $('image-status').textContent=job.message||'Image not completed.';return; }
+        $('image-status').textContent='Creating your image with GPT Image 2.5… You can keep editing.';
+        await new Promise(resolve=>setTimeout(resolve,5000));
+      }
+      $('image-status').textContent='Still waiting. Use Check existing image to resume without another generation charge.';
+    }catch(error){$('image-status').textContent=error.message+' Use Check existing image to resume.';}
+    finally{imageBusy=false;$('create-image').disabled=false;$('resume-image').disabled=false;}
+  }
+  $('create-image').addEventListener('click',async()=>{
+    if(imageBusy)return;
+    const prompt=$('image-prompt').value.trim();if(prompt.length<10){$('image-status').textContent='Describe the image in at least 10 characters.';return;}
+    imageBusy=true;$('create-image').disabled=true;$('image-proposal').hidden=true;imageProposal=null;
+    const id=crypto.randomUUID().replaceAll('-','');
+    try{
+      imageReceipt(id);$('image-status').textContent='Connecting securely to Runway…';
+      const job=await api('/api/create-image',{id,prompt,ratio:$('image-ratio').value});
+      if(job.status==='UNCONFIRMED'){ $('image-status').textContent=job.message;$('resume-image').hidden=false;return; }
+      await watchImage(id);
+    }catch(error){$('image-status').textContent=error.message;$('resume-image').hidden=false;}
+    finally{imageBusy=false;$('create-image').disabled=false;}
+  });
+  $('resume-image').addEventListener('click',()=>{const id=localStorage.getItem(IMAGE_JOB);if(!imageBusy&&/^[a-f0-9]{32}$/.test(id||''))watchImage(id);});
+  $('use-image').addEventListener('click',()=>{
+    if(!imageProposal)return;
+    state.hero=imageProposal.image;state.heroSource={kind:'generated',model:imageProposal.model,prompt:imageProposal.prompt,job:imageProposal.id};
+    state.versions.forEach(v=>v.approved=false);$('remove-hero').hidden=false;renderBoard();if(current())showReview();persist();
+    $('image-proposal').hidden=true;$('image-status').textContent='Concept image added. Review its framing and save your project.';
+  });
+  $('keep-image').addEventListener('click',()=>{$('image-proposal').hidden=true;imageProposal=null;$('image-status').textContent='Kept your existing image.';});
+  try{$('resume-image').hidden=!/^[a-f0-9]{32}$/.test(localStorage.getItem(IMAGE_JOB)||'');}catch{}
   new ResizeObserver(resize).observe($('board-fit'));
   try{const saved=localStorage.getItem(STORAGE);if(saved)state=validateProject(JSON.parse(saved));}catch{$('save-status').textContent='A saved draft could not be loaded. Open a saved project if you have one.';}
   restoreInputs();installFont().then(showVersion);
-  api('/api/status').then(status=>{aiAvailable=status.ai_available;$('generate').disabled=!aiAvailable;$('generation-status').textContent=aiAvailable?'Ready when you are.':'AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{$('generate').disabled=true;$('generation-status').textContent=error.message;});
+  api('/api/status').then(status=>{aiAvailable=status.ai_available;$('image-status').textContent=status.image_configured?'GPT Image 2.5 selected. A Runway credential is configured; live access is not yet verified.':'GPT Image 2.5 selected. Runway credential connection is still needed.';$('generate').disabled=!aiAvailable;$('generation-status').textContent=aiAvailable?'Ready when you are.':'AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{$('generate').disabled=true;$('generation-status').textContent=error.message;});
 })();

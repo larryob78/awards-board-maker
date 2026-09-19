@@ -74,3 +74,15 @@ Tests use synthetic temporary data and mocked provider calls. They cover source/
 Live verification must additionally exercise generation, writing accept/undo, the three layouts and typography presets, image/font uploads, autosave/reopening, and PNG/PDF output at desktop and mobile widths. Fitting and expert aesthetic judgement are different checks: readable, unclipped text does not establish that the composition is award-worthy. For product release, compare representative real campaigns with a senior designer's assessment of hierarchy, typography, storytelling, evidence and brand fit, and retain revision feedback.
 
 Provider reference: [Gemini generateContent API](https://ai.google.dev/api/generate-content).
+
+## GPT Image as the primary image model
+
+The image studio uses OpenAI GPT Image 2.5 Sunburst through Runway (`gpt_image_2_5_sunburst`). It requests one high-quality image per click, in portrait, square or landscape. It never silently falls back to another model. Writing and layout assistance continue to use the existing text provider. Model and request fields verified against [Runway documentation](https://docs.dev.runwayml.com/api.md) on 19 September 2026.
+
+Configure `runway_secret_ref` in ignored `references.local.json` with a verified 1Password secret reference (`op://vault-id/item-id/field-id`), plus `runway_account` if needed. The 1Password CLI must be installed and the vault unlocked/CLI access approved. Alternatively inject `RUNWAYML_API_SECRET` or `RUNWAY_API_KEY` into the server environment. Never paste credentials into browser controls, project JSON or tracked files. Secret references contain identifiers, not secret values. Keys are retrieved server-side and cached only in process memory for ten minutes.
+
+Only the image description is sent to Runway. Uploaded campaign images, logos and reference boards are not included. Generation consumes existing Runway credits. The result is a proposal: use it explicitly or keep the current image. Accepted generated images are labelled as AI concepts on the board, retained inside saved projects, and clear human approvals. They are not evidence of actual campaign execution.
+
+Task receipts and completed image bytes are saved under ignored `reference-data/image-jobs/`. The browser remembers the last request ID; use **Check existing image** after a refresh or network interruption. A duplicate request ID never submits twice. An uncertain submission is retained as UNCONFIRMED and must be checked in Runway before deliberately starting another generation. No provider error bodies, API keys or signed media URLs enter browser responses.
+
+Local mocked-provider tests cover the request contract, duplicate-charge prevention, restart recovery, vault failures and output-host restrictions. A successful live provider test is a separate acceptance gate; choosing a model or supplying a secret reference alone does not prove access.
