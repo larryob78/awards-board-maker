@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 import certifi
 from design_engine import create_board, library, validate_input
 from writing_engine import refine_copy
-from image_engine import ImageJobs, MODEL as IMAGE_MODEL, configured as image_configured
+from image_engine import ImageJobs, MODEL as IMAGE_MODEL, configured as image_configured, public_models
 
 ROOT = Path(__file__).resolve().parent
 STOP = set('a an and are as at be by for from in is it of on or the this to with'.split())
@@ -242,6 +242,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_data(403, {'error': 'Local access only.'})
         path = urlparse(self.path).path
         corpus = self.server.corpus
+        if path == '/api/image-models':
+            capabilities = public_models()
+            capabilities['configured'] = image_configured(corpus.config)
+            capabilities['live_verified'] = False
+            return self.send_data(200, capabilities)
         if path == '/api/status':
             learned = library(corpus.config)
             return self.send_data(200, {'campaigns': len(corpus.records), 'images': corpus.image_count,
@@ -277,6 +282,7 @@ class Handler(BaseHTTPRequestHandler):
                   '/style.css': ('style.css', 'text/css'), '/script.js': ('script.js', 'text/javascript'),
                   '/references.js': ('references.js', 'text/javascript')}
         assets.update({'/studio.js': ('studio.js', 'text/javascript'), '/studio.css': ('studio.css', 'text/css'),
+                       '/image-craft.js': ('image-craft.js', 'text/javascript'),
                        '/typography.js': ('typography.js', 'text/javascript'),
                        '/classic': ('classic.html', 'text/html; charset=utf-8')})
         if path in assets:
@@ -289,7 +295,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_data(403, {'error': 'Local JSON requests only.'})
         try:
             length = int(self.headers.get('Content-Length', '0'))
-            maximum = 30_000_000 if self.path == '/api/export' else 40000
+            # A 20 MP lossless RGBA source can approach 84 MB; its base64 form
+            # plus an 8 MB selection mask needs a larger bound than board export.
+            maximum = 125_000_000 if self.path == '/api/create-image' else 30_000_000 if self.path == '/api/export' else 40000
             if not 0 < length <= maximum:
                 raise ValueError('Request is too large or empty.')
             data = json.loads(self.rfile.read(length))

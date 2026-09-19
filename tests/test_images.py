@@ -1,4 +1,7 @@
 import json
+import base64
+import io
+from PIL import Image
 from pathlib import Path
 import tempfile
 import unittest
@@ -38,8 +41,10 @@ class ImageTests(unittest.TestCase):
 
     @patch('image_engine.credential',return_value='key')
     @patch('image_engine.provider')
-    @patch('image_engine.download_image',return_value='data:image/jpeg;base64,aGVsbG8=')
+    @patch('image_engine.download_image')
     def test_completed_image_is_saved_and_recoverable(self,download,provider,key):
+        output=io.BytesIO();Image.new('RGB',(1536,1920),'red').save(output,format='JPEG')
+        download.return_value='data:image/jpeg;base64,'+base64.b64encode(output.getvalue()).decode()
         provider.side_effect=[{'id':'task'}, {'status':'SUCCEEDED','output':['https://media.cloudfront.net/image.jpg']}]
         self.jobs.create(self.data)
         result=self.jobs.status(self.data['id'])

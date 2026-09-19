@@ -11,14 +11,22 @@
   let writeProposal = null;
   let fontFamily = '';
   let loadedFontFace = null;
-  let saveTimer;
+  let saveTimer, craft, craftReady, restoring = true, projectChanging = false, saveQueue = Promise.resolve();
   function node(tag,text,className) { const el=document.createElement(tag); if(text!==undefined)el.textContent=text; if(className)el.className=className; return el; }
   function current() { return state.versions[state.current]; }
   function inputs() { return Object.fromEntries(INPUTS.map(id=>[id,$(id).value])); }
   function persist() {
+    if(restoring)return Promise.resolve();
     state.inputs=inputs();
-    try { localStorage.setItem(STORAGE,JSON.stringify(state)); $('save-status').textContent='Saved in this browser on this Mac.'; }
-    catch { $('save-status').textContent='Browser storage is full. Use Save project to keep your work.'; }
+    const snapshot=structuredClone(state);
+    saveQueue=saveQueue.catch(()=>{}).then(async()=>{
+      await ImageCraft.storage.putMany([['board:main',snapshot]]);
+      const pointer={...snapshot,hero:'',logo:'',font:'',largeAssetsInDB:true};
+      localStorage.setItem(STORAGE,JSON.stringify(pointer));
+      $('save-status').textContent='Saved locally in this browser. Save project keeps a separate copy with image history.';
+    }).catch(error=>{$('save-status').textContent='Local saving needs attention. Keep this tab open and use Save project. '+error.message;throw error;});
+    // Event handlers may ignore the promise; still keep the recoverable error visible.
+    saveQueue.catch(()=>{});return saveQueue;
   }
   function scheduleSave() { clearTimeout(saveTimer); saveTimer=setTimeout(persist,350); }
   async function api(path,data) {
@@ -30,7 +38,7 @@
     if(!response.ok) throw new Error(result.error||'The request failed. Please retry.');
     return result;
   }
-  function safeImage(value) { return typeof value==='string' && value.length<13000000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value); }
+  function safeImage(value) { return ImageCraft.safeImage(value); }
   function validateProject(value) {
     if(!value||value.format!==STORAGE||!value.inputs||typeof value.inputs!=='object'||Array.isArray(value.inputs)||!Array.isArray(value.versions)||value.versions.length>1000) throw new Error('This is not a supported Awards Board project.');
     for(const field of INPUTS) if(value.inputs[field]!==undefined && typeof value.inputs[field]!=='string') throw new Error('Invalid brief data.');
@@ -75,7 +83,7 @@
     const proof=node('section',undefined,`art-proof${draft.results?'':' missing'}`);proof.append(node('h3','Results'),node('p',draft.results||'Results to be confirmed.'));text.append(proof);content.append(visual,text);art.append(content);
     const footer=node('div',undefined,'art-footer');footer.append(node('span',draft.brand||'Campaign board'));if(!version.approved)footer.append(node('span','DRAFT · FOR REVIEW','review-watermark'));art.append(footer);
     if(window.BoardTypography)BoardTypography.fit(art,typographySettings());
-    resize(); requestAnimationFrame(checkQuality);
+    resize(); requestAnimationFrame(()=>{checkQuality();craft?.quality();});
     document.querySelectorAll('[data-layout]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.layout===version.layout)));
     $('draft-state').textContent=version.approved?'Reviewed by you':'AI draft · Review needed';$('approve').checked=!!version.approved;
     $('image-fit').value=version.imageFit||'contain';$('image-position').value=version.imagePosition||'center';
@@ -110,8 +118,18 @@
   }
   async function fileData(file) { return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the selected file.'));reader.readAsDataURL(file);}); }
   for(const name of ['hero','logo']){
-    $(`${name}-upload`).addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8_000_000)throw new Error('Choose a PNG, JPG or WebP image under 8 MB.');const data=await fileData(file);const img=new Image();img.src=data;await img.decode();if(img.width*img.height>40_000_000)throw new Error('Choose an image smaller than 40 megapixels.');state[name]=data;if(name==='hero')state.heroSource=null;if(current())current().approved=false;$(`remove-${name}`).hidden=false;renderBoard();if(current())showReview();persist();}catch(error){$('save-status').textContent=error.message;}});
-    $(`remove-${name}`).addEventListener('click',()=>{state[name]='';if(name==='hero')state.heroSource=null;$(`${name}-upload`).value='';$(`remove-${name}`).hidden=true;if(current())current().approved=false;renderBoard();if(current())showReview();persist();});
+    $(`${name}-upload`).addEventListener('change',async event=>{
+      const file=event.target.files[0];if(!file)return;const origin=state;
+      try{
+        if(projectChanging)throw new Error('Wait for the project to finish opening before uploading an image.');
+        const byteLimit=name==='hero'?84_000_000:8_000_000;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>byteLimit)throw new Error(`Choose a PNG, JPG or WebP image under ${byteLimit/1_000_000} MB.`);
+        await craftReady;const data=await fileData(file);const img=new Image();img.src=data;await img.decode();if(projectChanging||state!==origin)throw new Error('The project changed during upload. Its newer images were preserved; select the file again in the intended project.');
+        if(name==='hero'){ImageCraft.dimensions(img.naturalWidth,img.naturalHeight);await craft.attach(data,{},'Uploaded original');}
+        else {if(img.width*img.height>40_000_000)throw new Error('Choose a logo smaller than 40 megapixels.');state.logo=data;if(current())current().approved=false;$('remove-logo').hidden=false;renderBoard();await persist();}
+      }catch(error){$('save-status').textContent=error.message;}
+      event.target.value='';
+    });
+    $(`remove-${name}`).addEventListener('click',async()=>{try{await craftReady;if(name==='hero'){await craft.clearSource();state.heroSource=null;}state[name]='';$(`${name}-upload`).value='';$(`remove-${name}`).hidden=true;if(current())current().approved=false;renderBoard();if(current())showReview();await persist();}catch(error){$('save-status').textContent=error.message;}});
   }
   INPUTS.forEach(id=>$(id).addEventListener('input',()=>{scheduleSave();if(id==='color'&&current()){current().draft.color=$('color').value;current().approved=false;renderBoard();}}));
   $('brief-form').addEventListener('submit',async event=>{
@@ -131,8 +149,33 @@
   $('font-upload').addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>8_000_000||!/\.(otf|ttf|woff2?)$/i.test(file.name))throw new Error('Choose a font file under 8 MB.');state.font=await fileData(file);await installFont();if(current())current().approved=false;renderBoard();persist();}catch(error){$('save-status').textContent=error.message;}});
   function encodeText(text){const bytes=new TextEncoder().encode(text);let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(binary);}
   async function saveFile(format,data,statusId){const result=await api('/api/export',{format,data});const link=node('a',`Download ${format==='json'?'project':format.toUpperCase()}`);link.href=result.url;link.download=result.filename;link.target='_blank';link.rel='noopener';(format==='json'?$('save-links'):$('download-links')).append(link);$(statusId).textContent='Saved on this Mac. Use the download link to choose your own copy.';link.click();}
-  $('save-project').addEventListener('click',async()=>{persist();try{await saveFile('json',encodeText(JSON.stringify(state,null,2)),'save-status');}catch(error){$('save-status').textContent=error.message;}});
-  $('open-project').addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>20000000)throw new Error('Project files must be under 20 MB.');const loaded=validateProject(JSON.parse(await file.text()));state=loaded;restoreInputs();await installFont();showVersion();persist();}catch(error){$('save-status').textContent=error.message;}event.target.value='';});
+  $('save-project').addEventListener('click',async()=>{
+    try{
+      await craftReady;if(projectChanging)throw new Error('Wait for the project to finish opening before saving.');state.inputs=inputs();const origin=state,snapshot=await craft.currentImage();if(projectChanging||state!==origin)throw new Error('The project changed while preparing its backup. Save the current project again.');const recovered=ImageCraft.reconcileHero(state,snapshot);state=recovered.state;if(recovered.changed){renderBoard();if(current())showReview();persist();}
+      const imageCraft=await craft.exportBundle(),revision=imageCraft.session.revisions.find(r=>r.id===imageCraft.session.activeId);
+      const bundle={...state,hero:revision?'':state.hero,heroAssetRef:revision?.assetId||null,imageCraft};
+      const blob=new Blob([JSON.stringify(bundle)],{type:'application/json'}),url=URL.createObjectURL(blob);
+      const link=node('a','Download project with image history');link.href=url;link.download='awards-board-project-'+new Date().toISOString().slice(0,10)+'.json';
+      $('save-links').append(link);link.click();$('save-status').textContent='Project download prepared locally, including images, history and pending receipts. Keep the downloaded file as a separate backup.';
+    }catch(error){$('save-status').textContent=error.message;}
+  });
+  $('open-project').addEventListener('change',async event=>{
+    const file=event.target.files[0];if(!file)return;
+    if(projectChanging){$('save-status').textContent='Another project is still opening.';return;}projectChanging=true;$('image-craft-panel').inert=true;
+    try{
+      await craftReady;if(craft.hasPending())throw new Error('Stop local request checking before opening another project. Its saved receipt will remain recoverable.');
+      if(file.size>280_000_000)throw new Error('Project files must be under 280 MB.');
+      const parsed=JSON.parse(await file.text());
+      if(parsed.heroAssetRef){const checked=ImageCraft.validateBundle(parsed.imageCraft);const image=checked.assets.find(a=>a.id===parsed.heroAssetRef);if(!image)throw new Error('The project is missing its board image.');parsed.hero=image.data;}
+      const loaded=validateProject(parsed);delete loaded.heroAssetRef;
+      // Check/import all media before replacing the visible board. Imports preserve prior IDB records.
+      let projectId;
+      if(loaded.imageCraft){const checked=ImageCraft.validateBundle(loaded.imageCraft);const revision=checked.session.revisions.find(r=>r.id===checked.session.activeId);const asset=revision?checked.assets.find(a=>a.id===revision.assetId):null;if((asset?.data||'')!==(loaded.hero||''))throw new Error('The imported board image does not match its active image revision. The current project was preserved.');projectId=await craft.importBundle(checked);}
+      else projectId=await craft.startProject(loaded.hero,loaded.heroSource);
+      delete loaded.imageCraft;state=loaded;state.imageCraftId=projectId;restoreInputs();await installFont();showVersion();await persist();
+      $('save-status').textContent='Project and image history opened. Imported board approval is reset for review.';
+    }catch(error){$('save-status').textContent=error.message;}finally{projectChanging=false;$('image-craft-panel').inert=false;event.target.value='';}
+  });
   async function exportBoard(format){if(!current())return;const button=$(`export-${format}`);button.disabled=true;$('export-status').textContent='Preparing your board…';try{await document.fonts.ready;await Promise.all([...$('board-art').querySelectorAll('img')].map(img=>img.decode()));checkQuality();if(current().fitIssues?.length)throw new Error('Fix the text-fit warnings before exporting. Your draft is saved.');if(!window.html2canvas)throw new Error('The export library could not load. Check your internet connection and retry.');const canvas=await html2canvas($('board-art'),{scale:5,width:1400,height:990,backgroundColor:null,onclone:doc=>{const art=doc.getElementById('board-art');art.style.transform='none';art.style.position='relative';art.parentElement.style.width='1400px';art.parentElement.style.height='990px';}});let data;if(format==='png'){data=canvas.toDataURL('image/png').split(',')[1];}else{if(!window.jspdf)throw new Error('The PDF export library could not load.');const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a2',compress:true});pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,594,420,undefined,'FAST');data=pdf.output('datauristring').split(',')[1];}await saveFile(format,data,'export-status');}catch(error){$('export-status').textContent=error.message;}finally{button.disabled=false;}}
   ['png','pdf'].forEach(format=>$(`export-${format}`).addEventListener('click',()=>exportBoard(format)));
   $('load-example').addEventListener('click',()=>{if($('brief').value.trim()){$('generation-status').textContent='Your brief is already filled in. Save it before replacing it with an example.';return;}$('brand').value='REFILL';$('campaign').value='The next refill';$('brief').value='FICTIONAL DEMO. People want to cut single-use plastic but often forget their reusable bottles. REFILL placed refill stations at a community arts festival and added simple signs at food stalls, reminding visitors to refill. The idea was to make a refill the easiest next step. The activation used reusable bottles, festival maps and clear directional signs. No measured campaign results are available.';$('color').value='#dc5737';persist();$('generation-status').textContent='Fictional example loaded. Select Generate my board.';});
@@ -142,51 +185,19 @@
   $('apply-writing').addEventListener('click',()=>{if(!writeProposal)return;const {proposal,version,original}=writeProposal;if(current()!==version||version.draft[proposal.field]!==original){$('writing-status').textContent='This wording changed while the assistant was working. Request a fresh suggestion to keep your edits.';return;}version.draft[proposal.field]=proposal.proposed_text;version.approved=false;version.writing_history??=[];version.writing_events??=[];version.writing_events.push({field:proposal.field,action:'accepted',at:new Date().toISOString()});version.writing_history.push({field:proposal.field,before:original,after:proposal.proposed_text,evidence:proposal.evidence,action:'accepted',at:new Date().toISOString()});renderBoard();buildEditor();showReview();persist();$('writing-proposal').hidden=true;$('writing-status').textContent='Suggested wording applied. You can edit it further or restore the previous wording.';});
   $('reject-writing').addEventListener('click',()=>{if(writeProposal){writeProposal.version.writing_events??=[];writeProposal.version.writing_events.push({field:writeProposal.proposal.field,action:'rejected',at:new Date().toISOString()});persist();}$('writing-proposal').hidden=true;writeProposal=null;$('writing-status').textContent='Kept your existing wording.';});
   $('undo-writing').addEventListener('click',()=>{const version=current();const last=version?.writing_history?.at(-1);if(!last){$('writing-status').textContent='No accepted writing suggestion to undo.';return;}if(version.draft[last.field]!==last.after){$('writing-status').textContent='You edited this wording after applying the suggestion. Your newer changes are kept.';return;}version.draft[last.field]=last.before;version.writing_history.pop();version.approved=false;renderBoard();buildEditor();persist();$('writing-status').textContent='Previous wording restored.';});
-  let imageProposal=null, imageBusy=false;
-  const IMAGE_JOB='awards-board-image-job';
-  function imageReceipt(id){try{localStorage.setItem(IMAGE_JOB,id);}catch{throw new Error('Browser storage is full. Save your project and free space before generating.');}}
-  async function watchImage(id){
-    imageBusy=true;$('create-image').disabled=true;$('resume-image').hidden=false;$('resume-image').disabled=true;
+  craftReady=(async()=>{
     try{
-      for(let attempt=0;attempt<120;attempt++){
-        const job=await api(`/api/image-jobs/${id}`);
-        if(job.status==='SUCCEEDED'){
-          if(!safeImage(job.image))throw new Error('Unsupported generated image. Your board is unchanged.');
-          imageProposal=job;$('generated-image').src=job.image;$('image-proposal').hidden=false;
-          $('image-status').textContent='Your image is ready to review. Your current board is unchanged.';return;
-        }
-        if(['FAILED','CANCELED','UNCONFIRMED'].includes(job.status)){ $('image-status').textContent=job.message||'Image not completed.';return; }
-        $('image-status').textContent='Creating your image with GPT Image 2.5… You can keep editing.';
-        await new Promise(resolve=>setTimeout(resolve,5000));
-      }
-      $('image-status').textContent='Still waiting. Use Check existing image to resume without another generation charge.';
-    }catch(error){$('image-status').textContent=error.message+' Use Check existing image to resume.';}
-    finally{imageBusy=false;$('create-image').disabled=false;$('resume-image').disabled=false;}
-  }
-  $('create-image').addEventListener('click',async()=>{
-    if(imageBusy)return;
-    const prompt=$('image-prompt').value.trim();if(prompt.length<10){$('image-status').textContent='Describe the image in at least 10 characters.';return;}
-    imageBusy=true;$('create-image').disabled=true;$('image-proposal').hidden=true;imageProposal=null;
-    const id=crypto.randomUUID().replaceAll('-','');
-    try{
-      imageReceipt(id);$('image-status').textContent='Connecting securely to Runway…';
-      const job=await api('/api/create-image',{id,prompt,ratio:$('image-ratio').value});
-      if(job.status==='UNCONFIRMED'){ $('image-status').textContent=job.message;$('resume-image').hidden=false;return; }
-      await watchImage(id);
-    }catch(error){$('image-status').textContent=error.message;$('resume-image').hidden=false;}
-    finally{imageBusy=false;$('create-image').disabled=false;}
-  });
-  $('resume-image').addEventListener('click',()=>{const id=localStorage.getItem(IMAGE_JOB);if(!imageBusy&&/^[a-f0-9]{32}$/.test(id||''))watchImage(id);});
-  $('use-image').addEventListener('click',()=>{
-    if(!imageProposal)return;
-    state.hero=imageProposal.image;state.heroSource={kind:'generated',model:imageProposal.model,prompt:imageProposal.prompt,job:imageProposal.id};
-    state.versions.forEach(v=>v.approved=false);$('remove-hero').hidden=false;renderBoard();if(current())showReview();persist();
-    $('image-proposal').hidden=true;$('image-status').textContent='Concept image added. Review its framing and save your project.';
-  });
-  $('keep-image').addEventListener('click',()=>{$('image-proposal').hidden=true;imageProposal=null;$('image-status').textContent='Kept your existing image.';});
-  try{$('resume-image').hidden=!/^[a-f0-9]{32}$/.test(localStorage.getItem(IMAGE_JOB)||'');}catch{}
+      const saved=localStorage.getItem(STORAGE);
+      if(saved){const pointer=JSON.parse(saved);const stored=pointer.largeAssetsInDB?await ImageCraft.storage.get('board:main'):pointer;if(!stored)throw new Error('The local image database is missing. Open a saved project to recover its assets.');state=validateProject(stored);}
+      craft=await ImageCraft.mount({api,
+        apply:async(image,source)=>{state.hero=image;state.heroSource=source;state.imageCraftId=craft.getProjectId();state.versions.forEach(v=>v.approved=false);$('remove-hero').hidden=false;renderBoard();if(current())showReview();await persist();},
+        placement:()=>{const img=$('board-art').querySelector('.art-visual img');return img?{width:img.clientWidth,height:img.clientHeight,fit:current()?.imageFit||'contain'}:null;}
+      });
+      const recoverLegacy=!state.imageCraftId;state.imageCraftId=await craft.init(state.imageCraftId,state.hero,state.heroSource,recoverLegacy);
+      const recovered=ImageCraft.reconcileHero(state,await craft.currentImage());state=recovered.state;
+      restoreInputs();await installFont();showVersion();restoring=false;await persist();if(recovered.changed)$('image-status').textContent='Recovered the saved image revision and reset board approval for review. Original images and history are preserved.';
+    }catch(error){restoring=false;$('save-status').textContent=error.message;$('image-status').textContent=error.message;throw error;}
+  })();craftReady.catch(()=>{});
   new ResizeObserver(resize).observe($('board-fit'));
-  try{const saved=localStorage.getItem(STORAGE);if(saved)state=validateProject(JSON.parse(saved));}catch{$('save-status').textContent='A saved draft could not be loaded. Open a saved project if you have one.';}
-  restoreInputs();installFont().then(showVersion);
-  api('/api/status').then(status=>{aiAvailable=status.ai_available;$('image-status').textContent=status.image_configured?'GPT Image 2.5 selected. A Runway credential is configured; live access is not yet verified.':'GPT Image 2.5 selected. Runway credential connection is still needed.';$('generate').disabled=!aiAvailable;$('generation-status').textContent=aiAvailable?'Ready when you are.':'AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{$('generate').disabled=true;$('generation-status').textContent=error.message;});
+  api('/api/status').then(status=>{aiAvailable=status.ai_available;$('generate').disabled=!aiAvailable;$('generation-status').textContent=aiAvailable?'Ready when you are.':'AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{$('generate').disabled=true;$('generation-status').textContent=error.message;});
 })();

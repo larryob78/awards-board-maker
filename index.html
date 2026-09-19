@@ -8,6 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <script src="typography.js" defer></script>
+  <script src="image-craft.js" defer></script>
   <script src="studio.js" defer></script>
 </head>
 <body>
@@ -21,19 +22,12 @@
         <label for="brief">Tell us the story <span>Required</span></label><textarea id="brief" rows="7" minlength="30" maxlength="6000" required placeholder="What was the problem? What was your idea? What did you actually make or do? Write naturally, or paste your existing brief."></textarea>
         <label for="results">Results you can support</label><textarea id="results" rows="3" maxlength="550" placeholder="Paste approved results exactly as they should appear. Leave blank if you don’t have them yet."></textarea>
         <div class="asset-fields"><div><label for="hero-upload">Campaign image <span>Optional</span></label><input id="hero-upload" type="file" accept="image/png,image/jpeg,image/webp"><button id="remove-hero" class="text-button" type="button" hidden>Remove image</button></div><div><label for="logo-upload">Brand logo <span>Optional</span></label><input id="logo-upload" type="file" accept="image/png,image/jpeg,image/webp"><button id="remove-logo" class="text-button" type="button" hidden>Remove logo</button></div></div>
-        <details class="brief-options image-studio"><summary>Create a campaign image</summary>
-          <p>GPT Image 2.5 via Runway. Create one concept image, review it, then choose whether to use it.</p>
-          <label for="image-prompt">Describe your image</label><textarea id="image-prompt" rows="4" minlength="10" maxlength="4000" placeholder="Describe the subject, setting, composition, light and style. Keep board text separate so it stays editable."></textarea>
-          <label for="image-ratio">Image shape</label><select id="image-ratio"><option value="1536:1920">Portrait</option><option value="1920:1920">Square</option><option value="1920:1280">Landscape</option></select>
-          <p class="privacy-note">Only this description goes to Runway for OpenAI image generation. Each new image uses your Runway credits. Uploaded images and reference boards are not sent.</p>
-          <button id="create-image" type="button">Create image</button><button id="resume-image" type="button" hidden>Check existing image</button>
-          <p id="image-status" class="status" role="status" aria-live="polite">Checking the image connection…</p>
-          <div id="image-proposal" hidden><img id="generated-image" alt="AI-generated concept awaiting review" style="max-width:100%;border-radius:8px"><p>AI concept image. It is not documentary evidence of campaign execution.</p><button id="use-image" type="button">Use this image</button><button id="keep-image" type="button">Keep my existing image</button></div>
-        </details>
+        <button id="open-image-craft" class="text-button" type="button">Open Image Craft: generate or edit a selected area</button>
+        <p class="privacy-note">Images and selections stay local until you explicitly request a paid Runway generation or edit.</p>
         <details class="brief-options"><summary>Brand preferences</summary><label for="color">Brand accent</label><input id="color" type="color" value="#e24b32"><label for="direction">Design direction</label><textarea id="direction" rows="2" maxlength="500" placeholder="For example: bold and optimistic, or understated and premium."></textarea><label for="mandatories">Anything we must include or avoid?</label><textarea id="mandatories" rows="2" maxlength="1500" placeholder="Brand rules, approved wording, legal requirements…"></textarea></details>
         <button id="generate" class="primary" type="submit">Generate my board <span aria-hidden="true">↗</span></button>
         <p id="generation-status" class="status" role="status" aria-live="polite">Checking the design assistant…</p>
-        <p class="privacy-note">Your brief and a few automatically chosen style references go to Gemini. Your uploaded images stay on this Mac. No reference artwork is reused.</p>
+        <p class="privacy-note">Your brief and a few automatically chosen style references go to Gemini. Board generation does not send uploaded images. Image Craft sends them only for an explicit paid edit. No reference artwork is reused.</p>
       </form>
       <details class="how-it-works"><summary>How the design assistant works</summary><p>It applies learned principles for hierarchy, image balance, storytelling and readable proof, then typesets your own content. No reference browsing needed.</p><p id="learning-status">Loading the design library…</p><p>AI wording is a draft. Check every claim before approving it. The tool does not verify festival submission rules.</p></details>
       <button id="load-example" class="text-button" type="button">Try a fictional example</button>
@@ -42,6 +36,41 @@
     </aside>
     <section class="design-panel" aria-labelledby="design-heading">
       <div class="design-toolbar"><div><span class="step">02</span><h2 id="design-heading">Your board</h2></div><span id="draft-state" class="draft-label">Ready for your story</span></div>
+      <details id="image-craft-panel" class="image-craft-panel">
+        <summary>Image Craft <span>Local image edits, reviewed before applying</span></summary>
+        <div class="craft-layout">
+          <div class="craft-workspace">
+            <p id="image-source-label" class="craft-meta">No image selected</p>
+            <p id="image-empty" class="craft-empty">Upload a campaign image in Your campaign, or describe a new concept. Your board changes only when you apply a proposal.</p>
+            <div id="image-stage-wrap" class="image-stage-wrap" hidden><canvas id="image-canvas" aria-label="Image selection canvas. Use the rectangle coordinate fields for keyboard selection."></canvas></div>
+            <p id="image-quality" class="craft-meta" hidden></p>
+            <div id="image-selection-tools" hidden>
+              <div class="craft-row"><label for="image-tool">Selection tool<select id="image-tool"><option value="rectangle">Rectangle</option><option value="lasso">Freehand lasso</option><option value="brush">Brush</option></select></label><label for="image-zoom">Zoom<select id="image-zoom"><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label><label for="image-brush">Brush radius (source px)<input id="image-brush" type="number" min="1" max="1024" value="40"></label><label for="image-feather">Edge feather (source px)<input id="image-feather" type="number" min="0" max="64" value="0"></label></div>
+              <p id="image-selection-status" class="craft-meta" role="status">No area selected.</p>
+              <details class="craft-coordinates"><summary>Set a rectangle with the keyboard</summary><div class="craft-row"><label for="image-rect-x">Left (px)<input id="image-rect-x" type="number" min="0" step="1" value="0"></label><label for="image-rect-y">Top (px)<input id="image-rect-y" type="number" min="0" step="1" value="0"></label><label for="image-rect-width">Width (px)<input id="image-rect-width" type="number" min="1" step="1" value="1"></label><label for="image-rect-height">Height (px)<input id="image-rect-height" type="number" min="1" step="1" value="1"></label></div><button id="image-set-rectangle" type="button">Set rectangle</button></details>
+              <button id="image-clear-selection" class="text-button" type="button">Clear selection</button>
+              <p class="privacy-note">The server sends a contextual crop to Runway, then composites the returned edit into the selected area. Pixels outside the mask are preserved locally. Feathering stays inside the selection.</p>
+            </div>
+          </div>
+          <div class="craft-controls">
+            <label for="image-mode">Action<select id="image-mode"><option value="generate">Generate a new image</option><option value="whole">Edit the whole image</option><option value="selection">Edit a selected area</option></select></label>
+            <label for="image-model">Image model<select id="image-model"><option value="">Loading available models…</option></select></label>
+            <label for="image-ratio">Native output dimensions<select id="image-ratio"><option value="">Choose a model first</option></select></label>
+            <label for="image-prompt">Image instructions</label><textarea id="image-prompt" rows="5" aria-describedby="image-prompt-count image-transfer" placeholder="Describe the image or the change you want. Keep board lettering separate so it stays editable."></textarea><p id="image-prompt-count" class="craft-meta"></p>
+            <p id="image-transfer" class="privacy-note">Uploads and drawing stay local until an explicit request.</p><p id="image-cost" class="privacy-note">Paid request. Base price has not been verified.</p>
+            <label class="craft-consent" for="image-paid-consent"><input id="image-paid-consent" type="checkbox">I authorise the displayed Runway transfer and paid request.</label>
+            <button id="create-image" type="button" disabled>Generate with Runway · paid</button>
+            <button id="resume-image" type="button" hidden>Check existing request</button><button id="stop-image-watch" type="button" hidden>Stop checking locally</button><button id="dismiss-image-receipt" class="text-button" type="button" hidden>Archive this receipt and allow a new request</button>
+            <p id="image-status" class="status" role="status" aria-live="polite">Loading local image storage…</p>
+            <p class="privacy-note">Stopping checks does not cancel provider processing or charges. All generated and edited images remain labelled AI concepts. Upscaling is planned, not available.</p>
+          </div>
+        </div>
+        <section id="image-proposal" class="image-proposal" aria-label="Image proposal review" hidden>
+          <h3>Review the image proposal</h3><div class="craft-comparison"><figure><figcaption>Before · request source</figcaption><img id="image-before" alt="Source image used for this request"><p id="image-before-empty">No source image</p></figure><figure><figcaption>After · AI concept proposal</figcaption><img id="generated-image" alt="AI concept proposal awaiting your decision"></figure></div>
+          <p id="image-proposal-detail" class="craft-meta"></p><p id="image-conflict" class="status" role="status"></p><button id="use-image" type="button">Apply image to board</button><button id="keep-image" type="button">Reject proposal</button>
+        </section>
+        <details class="craft-history"><summary>Image revisions and saved proposals</summary><p id="image-history-count" class="craft-meta"></p><div class="craft-row"><label for="image-history-select">Saved revision<select id="image-history-select"></select></label><button id="image-restore" type="button">Restore selected image</button><button id="image-undo" type="button">Undo image change</button></div><div id="image-proposal-list" class="craft-proposal-list"></div><p class="privacy-note">Save project downloads originals, image revisions, instructions and pending receipts together. Keep that file as a separate backup.</p></details>
+      </details>
       <div id="empty-state" class="empty-state"><div class="empty-paper" aria-hidden="true"><div class="paper-title">A great idea.<br>A clear story.</div><div class="paper-line"></div><div class="paper-columns"><i></i><i></i><i></i></div></div><h2>From a brief to a designed board.</h2><p>Add your campaign story, then generate an editable draft.<br>Layout, hierarchy and typography are handled for you.</p></div>
       <div id="working-state" class="working-state" hidden><span class="pulse" aria-hidden="true"></span><h2>Shaping your story.</h2><p id="working-message">Applying design principles and building your first draft…</p><p>Your existing draft and edits stay safe.</p></div>
       <div id="board-workspace" hidden>
