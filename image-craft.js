@@ -9,6 +9,9 @@
   const MAX_IMAGE_BYTES = 84_000_000; // Bounded decoded output; source and output share the backend roundtrip cap.
   const MAX_BUNDLE_CHARS = 240_000_000;
   const ID = /^[a-f0-9]{32}$/;
+  const MODEL_NAMES = { gpt_image_2_5_sunburst: 'GPT Image 2.5 Sunburst', gen4_image_turbo: 'Runway Gen-4 Image Turbo', gen4_image: 'Runway Gen-4 Image' };
+  const modelName = id => MODEL_NAMES[id] || 'Saved image model';
+  const historyLabel = label => Object.entries(MODEL_NAMES).reduce((text, [id, name]) => text.replaceAll(id, name), label);
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
   function uid() { return crypto.randomUUID().replaceAll('-', ''); }
   function imageBytes(uri) {
@@ -246,7 +249,7 @@
       syncActions(); redraw(); quality();
     }
     function history() {
-      $('image-history-select').replaceChildren(...session.revisions.map((r, i) => { const op = node('option', `${i + 1}. ${r.label}${r.id === session.activeId ? ' (current)' : ''}`); op.value = r.id; return op; }));
+      $('image-history-select').replaceChildren(...session.revisions.map((r, i) => { const op = node('option', `${i + 1}. ${historyLabel(r.label)}${r.id === session.activeId ? ' (current)' : ''}`); op.value = r.id; return op; }));
       $('image-history-select').value = session.activeId || '';
       $('image-history-count').textContent = `${session.revisions.length} image revisions. Restoring adds a revision and preserves later work.`;
       const list = $('image-proposal-list'); list.replaceChildren();
@@ -266,7 +269,7 @@
       const after = await asset(p.assetId), beforeRevision = session.revisions.find(r => r.id === p.baseId), before = beforeRevision ? await asset(beforeRevision.assetId) : null;
       $('image-before').hidden = !before; if (before) $('image-before').src = before.data;
       $('image-before-empty').hidden = !!before; $('generated-image').src = after.data; $('image-proposal').hidden = false;
-      $('image-proposal-detail').textContent = `${p.model || 'Recorded model'} · ${p.mode || 'generate'} · AI concept. ${p.status === 'proposed' ? 'Your board is unchanged.' : `Recorded decision: ${p.status}.`} ${p.edit_metadata ? 'A crop was processed and composited locally. ' : ''}${p.prompt || ''}`;
+      $('image-proposal-detail').textContent = `${modelName(p.model)} · ${p.mode || 'generate'} · AI concept. ${p.status === 'proposed' ? 'Your board is unchanged.' : `Recorded decision: ${p.status}.`} ${p.edit_metadata ? 'A crop was processed and composited locally. ' : ''}${p.prompt || ''}`;
       const stale = !canApply(p, session.activeId);
       $('image-conflict').textContent = p.status === 'proposed' && stale ? 'The source changed after this request. Apply is blocked. Restore the request source in history and make a new request; this proposal stays saved.' : '';
       $('use-image').disabled = stale; $('keep-image').disabled = p.status !== 'proposed';
@@ -371,7 +374,7 @@
       session.receipts ||= []; session.receipts.push(session.pending); session.pending = null; await save(); history(); syncActions(); status('Previous receipt preserved in exported history. A new request will be a separate paid action.'); });
     $('use-image').addEventListener('click', async () => {
       try { if (!canApply(activeProposal, session.activeId)) throw new Error('The source changed. This proposal cannot overwrite it.');
-        const p = activeProposal; await applyRevision(p.assetId, `${p.mode || 'Generated'} · ${p.model || 'AI concept'}`, { proposalId: p.id }); p.status = 'accepted'; await save(); history(); await showProposal(p); status('Image applied. Logo, typography and copy were preserved. Undo image or restore a revision at any time.');
+        const p = activeProposal; await applyRevision(p.assetId, `${p.mode || 'Generated'} · ${modelName(p.model)}`, { proposalId: p.id }); p.status = 'accepted'; await save(); history(); await showProposal(p); status('Image applied. Logo, typography and copy were preserved. Undo image or restore a revision at any time.');
       } catch (e) { status(e.message); }
     });
     $('keep-image').addEventListener('click', async () => { if (!activeProposal || activeProposal.status !== 'proposed') return; activeProposal.status = 'rejected'; await save(); history(); await showProposal(activeProposal); status('Proposal rejected. Your current image and the proposal are both preserved.'); });
