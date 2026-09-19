@@ -160,3 +160,43 @@ main {
   font-size: 0.9rem;
   white-space: pre-wrap;
 }
+
+/* Reference retrieval stays outside the exported board canvas. */
+.references { padding: 1.25rem; background: #fff; border-bottom: 1px solid #d5dee7; }
+.references > details > summary { font-size: 1.3rem; font-weight: 700; cursor: pointer; }
+.references > details > summary span { font-size: .95rem; font-weight: 400; margin-left: .75rem; }
+.references p { line-height: 1.5; }
+.references label { display: block; font-weight: 600; margin-bottom: .5rem; }
+.reference-row { display: flex; gap: .65rem; }
+.reference-row input { flex: 1; min-width: 0; }
+.references input, .references textarea { border: 1px solid #a4b6c8; border-radius: 5px; font: inherit; padding: .75rem; }
+.references button { padding: .65rem .9rem; background: #1a4a7a; color: white; border: 0; border-radius: 5px; font: inherit; cursor: pointer; }
+.references button:disabled { opacity: .5; cursor: default; }
+.references button[aria-pressed="true"] { background: #276447; }
+.references :focus-visible { outline: 3px solid #b97400; outline-offset: 3px; }
+.references a { color: #164c82; text-underline-offset: 3px; }
+.reference-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; max-height: 650px; overflow-y: auto; }
+.reference-card { border: 1px solid #ccd8e3; border-radius: 8px; padding: .85rem; }
+.reference-card img { width: 100%; height: 190px; object-fit: contain; background: #eef2f5; border-radius: 3px; }
+.reference-card h3 { font-size: 1.05rem; margin: .8rem 0 .3rem; }
+.reference-card p { margin: .4rem 0; }
+.reference-card details { margin: .6rem 0; }
+.reference-card details p { max-height: 160px; overflow-y: auto; white-space: pre-wrap; }
+.reference-card-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .8rem; margin-top: .8rem; }
+.reference-note { font-size: .85rem; color: #4d6172; }
+.reference-guidance { margin-top: 1.2rem; padding: 1rem; background: #f1f5f9; border-radius: 8px; }
+.reference-guidance h2 { font-size: 1.1rem; }
+.reference-guidance h2 span { font-weight: 400; margin-left: .5rem; }
+.reference-guidance textarea { width: 100%; box-sizing: border-box; }
+#reference-selection { display: flex; flex-wrap: wrap; gap: 1rem; list-style: none; padding: 0; }
+#reference-selection li { display: flex; align-items: center; gap: .5rem; }
+#reference-selection button { font-size: .8rem; padding: .3rem .5rem; }
+.guidance-card { background: white; border-left: 3px solid #1a4a7a; padding: .8rem 1rem; margin: 1rem 0; }
+.guidance-card h3 { margin-top: 0; }
+.guidance-card a { display: inline-block; margin: .2rem 1rem .2rem 0; }
+@media (max-width: 700px) {
+  .references > details > summary span { display: block; margin: .5rem 0; }
+  .reference-row { flex-direction: column; }
+  main { flex-direction: column; }
+  .controls { width: auto; }
+}

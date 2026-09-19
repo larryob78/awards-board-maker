@@ -1,0 +1,8 @@
+{
+  "board_dir": "/path/to/reference-board-images",
+  "metadata_csv": "/path/to/cannes-lions-FINAL-enriched-6307.csv",
+  "campaign_json": "/path/to/cannes-master-consolidated.json",
+  "source_label": "Cannes reference boards",
+  "drive_folder_url": "",
+  "model": "gemini-3.6-flash"
+}

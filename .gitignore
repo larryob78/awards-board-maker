@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+references.local.json
+reference-data/
+__pycache__/
+.venv/
+.DS_Store
+test-results/
