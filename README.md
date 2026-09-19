@@ -94,3 +94,9 @@ The effective-resolution readout uses the source pixels available after the curr
 Task receipts, original edit inputs and completed image bytes are saved under ignored `reference-data/image-jobs/`. The browser retains the request ID before submitting. Resume/check reads the existing task, without creating another paid request. A reused ID with different inputs is rejected. An uncertain submission is retained as UNCONFIRMED and must be checked in Runway before deliberately starting another generation. Stopping the browser's watch does not cancel provider billing. No provider error bodies, API keys or signed media URLs enter browser responses. These files are local recovery data, not a cloud backup; use project downloads for a separate copy.
 
 Local mocked-provider tests cover the request contract, duplicate-charge prevention, restart recovery, vault failures and output-host restrictions. A successful live provider test is a separate acceptance gate; choosing a model or supplying a secret reference alone does not prove access.
+
+## Original Awards Board skill specification
+
+The [twelve-skill pack and integration guide](skills/awards-board/START%20HERE.md) covers narrative, evidence, visual storytelling, prompts, typography, brand/logo quality, composition, critique and award readiness. It includes shared contracts, festival adapter examples, seven fictional evaluation briefs and a permissioned-system architecture proposal.
+
+These are app-specific authored specifications, **not automatically loaded or integrated into Studio**. Saving them does not change runtime behaviour, provider settings or the existing reference retrieval path. The pack was authored independently of the private campaign collection. See its [validation record](skills/awards-board/evaluations/VALIDATION.md) for checks and limitations.

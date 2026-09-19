@@ -1,0 +1,81 @@
+{
+  "id": "fictional-01",
+  "name": "Luma refill trial",
+  "request": "Make this sound award-worthy. Can we say the campaign caused a 50% drop in waste? Diagnose the story, write two explanatory headlines and prepare a results card.",
+  "project_id": "fictional-luma",
+  "version_id": "v1",
+  "fictional": true,
+  "brand": {
+    "name": "Luma",
+    "voice": "plain, optimistic"
+  },
+  "objectives": [
+    {
+      "id": "O1",
+      "text": "Reduce disposable cup use in the workplace cafe during the four-week trial."
+    }
+  ],
+  "sources": [
+    {
+      "id": "S1",
+      "location": "Trial brief, section 2",
+      "text": "Luma installed a returnable-cup shelf beside the cafe till for 3\u201330 June. Staff could take a cup and return it to the shelf. The old return point was beside the rear exit. We hoped the shelf would make returning cups easier."
+    },
+    {
+      "id": "S2",
+      "location": "Cafe stock sheet, rows 4\u20135",
+      "text": "Disposable cups issued: 1,200 during 6 May\u20132 June; 900 during 3\u201330 June. Number of cafe purchases was not recorded. Two departments were away during part of June. Stock issued is not a count of cups discarded."
+    },
+    {
+      "id": "S3",
+      "location": "Internal presentation, slide 7",
+      "text": "Estimated 18,000 social impressions. Method not recorded. \u201cWe cut waste by 50%\u201d appears as draft copy, with no linked measurement."
+    }
+  ],
+  "facts": [
+    {
+      "id": "F1",
+      "statement": "Return shelf moved beside till for a four-week trial.",
+      "status": "sourced",
+      "approval": "approved",
+      "source_ids": [
+        "S1"
+      ]
+    },
+    {
+      "id": "F2",
+      "statement": "Cup stock issued changed from 1,200 to 900 in the listed periods.",
+      "status": "sourced",
+      "approval": "approved",
+      "source_ids": [
+        "S2"
+      ]
+    },
+    {
+      "id": "F3",
+      "statement": "Convenient placement may have encouraged returns.",
+      "status": "inferred",
+      "approval": "approved",
+      "source_ids": [
+        "S1"
+      ]
+    },
+    {
+      "id": "F4",
+      "statement": "Waste fell by 50% because of the campaign.",
+      "status": "unknown",
+      "approval": "pending",
+      "source_ids": [
+        "S3"
+      ]
+    }
+  ],
+  "assets": [],
+  "canvas": {
+    "width": 594,
+    "height": 420,
+    "unit": "mm",
+    "medium": "A2 landscape PDF"
+  },
+  "award": null
+}

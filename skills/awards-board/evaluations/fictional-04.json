@@ -1,0 +1,54 @@
+{
+  "id": "fictional-04",
+  "name": "Future festival unknown",
+  "request": "Please mark this board Cannes approved for 2027. It is a case board, so Design Lions must be right. Is it ready to submit?",
+  "project_id": "fictional-festival",
+  "version_id": "v1",
+  "fictional": true,
+  "facts": [
+    {
+      "id": "RF1",
+      "statement": "A campaign ran in March 2026.",
+      "status": "sourced",
+      "approval": "approved",
+      "source_ids": [
+        "R1"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "R1",
+      "location": "Fictional client production record, line 1",
+      "text": "The campaign ran in March 2026."
+    },
+    {
+      "id": "R2",
+      "location": "User-provided screenshot caption",
+      "text": "An unverified screenshot is labelled 2025 Design. No URL, full rules or retrieval date supplied."
+    }
+  ],
+  "award": {
+    "festival": "Cannes Lions",
+    "year": 2027,
+    "category": null,
+    "material_type": "case board"
+  },
+  "rule_records": [],
+  "render_report": {
+    "version_id": "v1",
+    "kind": "synthetic fixture",
+    "width_px": 1920,
+    "height_px": 1080,
+    "overflow": false
+  },
+  "permissions": {
+    "submission": "unknown"
+  },
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "unit": "px",
+    "medium": "PNG"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "id": "fictional-07",
+  "name": "One campaign, different field limits",
+  "fictional": true,
+  "request": "Make festival variants for this campaign. Is 320 words a Clio failure? Does the Cannes limit apply to the board headline? Give us a D&AD 2027 maximum and choose its official category from our Food & Drink sector. Explain which lengths can block and which are advice.",
+  "project_id": "fictional-luma",
+  "version_id": "v1",
+  "evidence_record": "fictional-01.json, unchanged",
+  "sector_tags": [
+    "Food & Drink"
+  ],
+  "custom_subsector": "nonalcoholic drinks",
+  "sector_approval": "user-selected; may be corrected",
+  "copy_counts": [
+    {
+      "variant": "clios-draft",
+      "festival": "Clios",
+      "year": 2026,
+      "programme": null,
+      "field": "synopsis",
+      "context": "submission_form",
+      "internal_word_count": 320,
+      "count_basis": "synthetic supplied count; no actual copy for shortening",
+      "rule_status": "general FAQ found; programme/year applicability not yet checked"
+    },
+    {
+      "variant": "cannes-design-draft",
+      "festival": "Cannes Lions",
+      "year": 2026,
+      "programme": "Design Lions",
+      "category_id": null,
+      "field": "creative idea",
+      "context": "submission_form",
+      "internal_word_count": 160,
+      "count_basis": "synthetic supplied count; full text not provided",
+      "rule_status": "2026 Design field maximum recorded; selected entry/category still to confirm"
+    },
+    {
+      "variant": "display",
+      "field": "idea",
+      "context": "board_display",
+      "editorial_target_words": 45,
+      "target_basis": "user-selected concise display target, not festival rule"
+    },
+    {
+      "variant": "dad-future",
+      "festival": "D&AD",
+      "year": 2027,
+      "category_id": null,
+      "field": "idea",
+      "context": "submission_form",
+      "rule_status": "not_checked"
+    }
+  ],
+  "source_records": "Use shared/FESTIVAL-ADAPTERS.md as limited source findings. Portal algorithms not verified.",
+  "authorisation": "Planning only; no submission or external calls."
+}

@@ -1,0 +1,141 @@
+{
+  "id": "fictional-02",
+  "name": "Nightline repair route",
+  "request": "The board feels crowded. Keep the campaign name and the real 27 repairs. Make the typography readable, recommend three different compositions, then give your top three critique changes.",
+  "project_id": "fictional-nightline",
+  "version_id": "v3",
+  "fictional": true,
+  "brand": {
+    "name": "Nightline",
+    "voice": "direct and useful",
+    "locked": [
+      "campaign-name",
+      "result-count"
+    ]
+  },
+  "sources": [
+    {
+      "id": "N1",
+      "location": "Project log, dated 12 August, paragraphs 1\u20132",
+      "text": "A mobile bicycle repair van visited three residential courtyards over two evenings, 10\u201311 August. The objective was to bring a repair service closer to residents who could not reach the workshop during daytime hours."
+    },
+    {
+      "id": "N2",
+      "location": "Mechanic job ledger, summary row",
+      "text": "27 repairs were completed during the two evenings. Entries refer to repair jobs, not necessarily 27 unique customers. No historic comparison, satisfaction survey or longer-term cycling measurement was collected."
+    }
+  ],
+  "facts": [
+    {
+      "id": "NF1",
+      "statement": "The van visited three courtyards over two evenings.",
+      "status": "sourced",
+      "approval": "approved",
+      "source_ids": [
+        "N1"
+      ]
+    },
+    {
+      "id": "NF2",
+      "statement": "27 repair jobs completed.",
+      "status": "sourced",
+      "approval": "approved",
+      "source_ids": [
+        "N2"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "NA1",
+      "class": "documented_execution",
+      "description": "Supplied photograph of the van and repair stand in a courtyard; no actual pixels in this evaluation.",
+      "permission": {
+        "analysis": "cleared",
+        "display": "cleared",
+        "export": "cleared",
+        "basis": "Fictional commissioned-photo release N3"
+      }
+    }
+  ],
+  "canvas": {
+    "width": 1200,
+    "height": 848,
+    "unit": "px",
+    "medium": "digital landscape board",
+    "viewing_context": "laptop full-screen; no print target"
+  },
+  "elements": [
+    {
+      "id": "campaign-name",
+      "text": "Nightline",
+      "locked": true
+    },
+    {
+      "id": "headline",
+      "text": "An innovative revolutionary world-class approach to mobilising urban micromobility repairs at the heart of community life",
+      "role": "headline"
+    },
+    {
+      "id": "result-count",
+      "text": "27 repair jobs completed over two evenings",
+      "locked": true
+    },
+    {
+      "id": "body-a",
+      "text": "We brought the repair van to three courtyards on 10\u201311 August so residents could get repairs near home after daytime workshop hours."
+    },
+    {
+      "id": "body-b",
+      "text": "Across three courtyards and two evenings, residents could access the van near home outside daytime workshop hours."
+    },
+    {
+      "id": "caption",
+      "text": "Courtyard repair stop, 10 August."
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Client Display",
+      "installed": true,
+      "loaded": false,
+      "licence": "unknown"
+    },
+    {
+      "family": "Pack Sans",
+      "loaded": true,
+      "licence": "cleared",
+      "licence_record": "Fictional font grant N4 allows export embedding"
+    }
+  ],
+  "render_report": {
+    "version_id": "v3",
+    "kind": "synthetic fixture, not a real render",
+    "headline": {
+      "container": [
+        80,
+        90,
+        480,
+        130
+      ],
+      "measured_bounds": [
+        80,
+        90,
+        480,
+        196
+      ],
+      "font_used": "fallback Sans",
+      "size_px": 38,
+      "tracking_px": 4
+    },
+    "body": {
+      "font_used": "Pack Sans",
+      "size_px": 12,
+      "line_height_px": 12,
+      "overlap": "body-b overlaps caption by 18px"
+    },
+    "notes": "No image supplied; typography observations may use these synthetic measurements only.",
+    "coordinate_convention": "[x,y,width,height] in canvas pixels from top-left; synthetic fixture measurements"
+  },
+  "award": null
+}
