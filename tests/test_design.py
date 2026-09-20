@@ -4,6 +4,7 @@ import copy
 import http.client
 import io
 import json
+import time
 from pathlib import Path
 import tempfile
 import threading
@@ -173,6 +174,11 @@ class DesignTests(unittest.TestCase):
             provider.side_effect = None
             provider.return_value = {'headline': 'A safe draft'}
             self.assertEqual(self.request(server, '/api/create-board', self.inputs)[0], 200)
+            # ThreadingHTTPServer can still be inside the handler finally briefly after the response.
+            for _ in range(50):
+                if not server.generation_lock.locked():
+                    break
+                time.sleep(0.01)
             self.assertFalse(server.generation_lock.locked())
 
     def test_exports_roundtrip_real_png_and_project_with_opaque_paths(self):

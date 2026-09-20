@@ -1,16 +1,16 @@
-# Overnight notes — Awards Board Maker
+# Overnight notes  -  Awards Board Maker
 
 Evidence time: 2026-09-20 ~01:10 IST (Europe/Dublin).
 Base commit: `96cc7ab` (skills pack). Work stayed in this clone; no git push.
 
 ## Bugs fixed
 
-1. **Cannes retrieval could not be turned off** — `create_board` always BM25-searched and attached up to three reference JPEGs. There was no Studio control, so A/B of the same brief was impossible.
-2. **Writing path always retrieved style examples** — `refine_copy` always called corpus search even when the user wanted principles-only craft.
-3. **Corpus path was config-only** — `board_dir` in `references.local.json` worked, but `CORPUS_PATH` env override (needed for overnight / laptop path injection) was missing.
-4. **Provenance was too thin for review** — matches returned id/source only, so the UI could not show filenames or thumbs for the RAG-ON strip.
-5. **Typography craft floor** — body size could sit under a comfortable A2 reading floor; display/body roles were soft. Raised body floor to ~20–21px (board coordinates), strengthened display sizes, and opened section/column rhythm.
-6. **Layout craft** — A2 landscape boards needed clearer hierarchy, quieter proof, and less visual clutter. CSS now enforces stronger headline measure, section breathing room, and a quieter results rail.
+1. **Cannes retrieval could not be turned off**  -  `create_board` always BM25-searched and attached up to three reference JPEGs. There was no Studio control, so A/B of the same brief was impossible.
+2. **Writing path always retrieved style examples**  -  `refine_copy` always called corpus search even when the user wanted principles-only craft.
+3. **Corpus path was config-only**  -  `board_dir` in `references.local.json` worked, but `CORPUS_PATH` env override (needed for overnight / laptop path injection) was missing.
+4. **Provenance was too thin for review**  -  matches returned id/source only, so the UI could not show filenames or thumbs for the RAG-ON strip.
+5. **Typography craft floor**  -  body size could sit under a comfortable A2 reading floor; display/body roles were soft. Raised body floor to ~20–21px (board coordinates), strengthened display sizes, and opened section/column rhythm.
+6. **Layout craft**  -  A2 landscape boards needed clearer hierarchy, quieter proof, and less visual clutter. CSS now enforces stronger headline measure, section breathing room, and a quieter results rail.
 
 ## Layout and type changes
 
