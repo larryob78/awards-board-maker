@@ -176,11 +176,11 @@
   $('brief-form').addEventListener('submit',async event=>{
     event.preventDefault();if(busy)return;
     if($('brief').value.trim().length<30){$('generation-status').textContent='Add a few sentences about the problem, idea and what happened.';$('brief').focus();return;}
-    busy=true;$('generate').disabled=true;$('working-state').hidden=false;$('empty-state').hidden=true;$('board-workspace').hidden=true;
+    busy=true;setGenerateEnabled(false,'Generating your board…');$('working-state').hidden=false;$('empty-state').hidden=true;$('board-workspace').hidden=true;
     $('working-state').scrollIntoView({block:'center',behavior:'smooth'});$('generation-status').textContent='Designing your board. You can keep editing the brief; this draft uses the text submitted now.';persist();
     try{const draft=await api('/api/create-board',{...inputs(),has_image:!!state.hero,use_rag:ragEnabled()});state.versions.push({draft,layout:draft.layout,typography:{preset:'editorial',scale:1,leading:1,tracking:0,spacing:1},approved:false,imageFit:'contain',imagePosition:'center',created:new Date().toISOString()});state.current=state.versions.length-1;showVersion();persist();$('generation-status').textContent='Your draft is ready. Try a treatment, refine the wording, then review.';}
     catch(error){$('generation-status').textContent=error.message;showVersion();}
-    finally{busy=false;$('working-state').hidden=true;$('generate').disabled=!aiAvailable;}
+    finally{busy=false;$('working-state').hidden=true;setGenerateEnabled(aiAvailable, aiAvailable?'':'AI is not configured. Add API keys in .env to enable Generate.');}
   });
   document.querySelectorAll('[data-layout]').forEach(button=>button.addEventListener('click',()=>{if(!current())return;current().layout=button.dataset.layout;current().approved=false;renderBoard();persist();}));
   ['image-fit','image-position'].forEach(id=>$(id).addEventListener('change',()=>{if(!current())return;current()[id==='image-fit'?'imageFit':'imagePosition']=$(id).value;current().approved=false;renderBoard();persist();}));
@@ -240,5 +240,19 @@
     }catch(error){restoring=false;$('save-status').textContent=error.message;$('image-status').textContent=error.message;throw error;}
   })();craftReady.catch(()=>{});
   new ResizeObserver(resize).observe($('board-fit'));
-  api('/api/status').then(status=>{aiAvailable=status.ai_available;$('generate').disabled=!aiAvailable;$('generation-status').textContent=aiAvailable?'Ready when you are.':'AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{$('generate').disabled=true;$('generation-status').textContent=error.message;});
+
+  function setGenerateEnabled(on, reason){
+    const btn=$('generate');
+    btn.disabled=!on;
+    btn.classList.toggle('is-busy', !!busy && !on);
+    btn.setAttribute('aria-disabled', String(!on));
+    if(!on){
+      btn.title=reason|| (busy?'Generating your board…':'Generate is unavailable until AI is configured.');
+      if(!busy) btn.setAttribute('aria-label', reason||'Generate unavailable: AI not configured');
+    }else{
+      btn.removeAttribute('title');
+      btn.setAttribute('aria-label','Generate my board');
+    }
+  }
+  api('/api/status').then(status=>{aiAvailable=status.ai_available;setGenerateEnabled(aiAvailable, aiAvailable?'':'AI is not configured. Add API keys in .env to enable Generate.');$('generation-status').textContent=aiAvailable?'Ready when you are.':'Generate is disabled: AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{setGenerateEnabled(false, error.message);$('generation-status').textContent='Generate is disabled: '+error.message;});
 })();
