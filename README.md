@@ -37,6 +37,11 @@ Open http://127.0.0.1:8766/. Keep the server running. `--port` can be changed. T
 - `principles_file`: optional path to the learned private library; defaults to `reference-data/principles.json`.
 - Set `GOOGLE_API_KEY` or `GEMINI_API_KEY` in the server environment. Alternatively, `credentials_file` may point to an existing private dotenv file with one of those variables. Never put a key in client code or committed JSON.
 
+
+## Cannes RAG toggle (NAP-20260920-AWARDS-RAG-TOGGLE)
+
+Studio includes a hard-to-miss **RAG ON | RAG OFF** control. **RAG ON** runs the existing BM25 keyword retrieval over your local Cannes JPG corpus and attaches at most three reference boards for hierarchy and craft only; their art is never placed on the user board, and the UI lists up to three filenames with small thumbs. **RAG OFF** skips Cannes retrieval entirely and designs from skills, DESIGN principles and craft rules alone. Drafts and exports are labelled `RAG-ON` or `RAG-OFF` for A/B comparison. Point the corpus with `CORPUS_PATH` in the environment, or `board_dir` in ignored `references.local.json` (see `references.example.json`). No IPA/D&AD layers are added, and JPG corpora stay out of git.
+
 ## Learn from the collection
 
 ```sh

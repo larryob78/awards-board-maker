@@ -8,7 +8,7 @@
   --type-headline-size: 68px;
   --type-headline-leading: 1.04;
   --type-headline-tracking: -.038em;
-  --type-body-size: 20px;
+  --type-body-size: 21px;
   --type-body-leading: 1.43;
   --type-body-tracking: 0em;
   --type-subhead-size: 22px;
@@ -115,3 +115,37 @@
 .craft-comparison{display:grid;grid-template-columns:1fr 1fr;gap:16px}.craft-comparison figure{margin:0;min-width:0}.craft-comparison img{display:block;width:100%;max-height:400px;object-fit:contain;background:#e6e9df}.craft-comparison figcaption{font-size:12px;font-weight:600;margin-bottom:8px}.image-proposal{border-top:1px solid var(--line);margin-top:18px;padding-top:18px}.image-proposal button{margin-right:10px}#image-conflict:not(:empty){color:#8b421d}.craft-history{border-top:1px solid var(--line);padding-top:14px}.craft-proposal-list{display:flex;flex-wrap:wrap;gap:8px}.craft-proposal-list button{font-size:11px}.craft-coordinates{margin:10px 0}
 @media(max-width:1150px){.craft-layout{grid-template-columns:1fr}.craft-controls{display:block}.image-stage-wrap{max-height:420px}}
 @media(max-width:760px){.image-craft-panel{padding:12px}.image-craft-panel>summary span{display:block;margin:6px 0}.craft-comparison{grid-template-columns:1fr}.craft-row label{flex-basis:100px}.craft-layout{gap:16px}}
+
+
+/* Cannes RAG toggle: hard to miss, ADHD-simple */
+.rag-toggle{margin:18px 0 8px;padding:14px;border:2px solid #2f5a3d;border-radius:8px;background:#eef6ea}
+.rag-toggle legend{font-size:14px;font-weight:700;padding:0 6px;color:#1e3d2a}
+.rag-help,.rag-toggle .rag-help{font-size:12px;line-height:1.45;color:#3d5646;margin:6px 0 12px}
+.rag-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rag-option{display:flex;flex-direction:column;gap:4px;padding:12px;border:2px solid #b7c7b4;border-radius:8px;background:#fff;cursor:pointer;font-weight:700}
+.rag-option small{font-weight:500;color:#5a6b5c}
+.rag-option:has(input:checked){border-color:#2f5a3d;background:#e3f0df;box-shadow:inset 0 0 0 1px #2f5a3d}
+.rag-option input{position:absolute;opacity:0;pointer-events:none}
+.rag-badge{display:inline-flex;align-items:center;margin-left:10px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;background:#dfe8da;color:#1e3d2a}
+.rag-badge[data-mode=off]{background:#f0e2d8;color:#6a3b16}
+.rag-badge[data-mode=on]{background:#d5e9cf;color:#1a4028}
+.rag-refs{margin:0 0 14px;padding:12px 14px;border:1px dashed #8aa38a;border-radius:8px;background:#f5f8f2}
+.rag-refs-title{font-size:12px;font-weight:700;margin-bottom:8px;color:#314736}
+.rag-refs-title span{font-weight:500;color:#66786a}
+.rag-ref-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.rag-ref-list li{display:flex;gap:8px;align-items:center;min-width:180px;max-width:260px;padding:6px;border:1px solid #d0d9cb;border-radius:6px;background:#fff;font-size:11px;line-height:1.35}
+.rag-ref-list img{width:72px;height:51px;object-fit:cover;border-radius:3px;background:#e7ebe3;flex:0 0 auto}
+.rag-ref-list strong{display:block;overflow-wrap:anywhere}
+
+/* A2 landscape craft: clearer hierarchy, breathing room, proof quieter than idea */
+.board-art{padding:56px 60px 50px}
+.board-art .art-headline{max-width:18ch;text-wrap:balance}
+.board-art .art-subhead{max-width:36ch;color:#2c382f}
+.board-art .art-section h3{opacity:.78}
+.board-art .art-proof{border-top-width:2px;padding-top:14px}
+.board-art .art-proof h3{letter-spacing:.14em}
+.board-art .art-text{gap:var(--type-section-gap,24px)}
+.board-art.layout-editorial .art-content{gap:52px}
+.board-art.layout-impact .art-headline{max-width:16ch}
+.board-art.layout-story .art-text{column-gap:28px}
+@media(max-width:760px){.rag-options{grid-template-columns:1fr}}

@@ -15,6 +15,8 @@
   function node(tag,text,className) { const el=document.createElement(tag); if(text!==undefined)el.textContent=text; if(className)el.className=className; return el; }
   function current() { return state.versions[state.current]; }
   function inputs() { return Object.fromEntries(INPUTS.map(id=>[id,$(id).value])); }
+  function ragEnabled() { const off=$('rag-off'); return !(off && off.checked); }
+  function ragLabel() { return ragEnabled() ? 'RAG-ON' : 'RAG-OFF'; }
   function persist() {
     if(restoring)return Promise.resolve();
     state.inputs=inputs();
@@ -65,6 +67,43 @@
   function resize() { const width=$('board-fit').clientWidth; if(!width)return; $('board-fit').style.height=`${width*990/1400}px`; $('board-art').style.transform=`scale(${width/1400})`; }
   function accentInk(hex) { const values=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4); return values[0]*.2126+values[1]*.7152+values[2]*.0722>.179?'#14231c':'#ffffff'; }
   function typographySettings() { return current()?.typography||{preset:'editorial',scale:1,leading:1,tracking:0,spacing:1}; }
+
+  function showRefs(draft) {
+    const panel = $('rag-refs');
+    const list = $('rag-ref-list');
+    const badge = $('rag-badge');
+    const mode = draft?.rag_mode || (draft?.use_rag === false ? 'RAG-OFF' : 'RAG-ON');
+    if (badge) {
+      badge.hidden = !draft;
+      badge.textContent = mode;
+      badge.dataset.mode = mode === 'RAG-ON' ? 'on' : 'off';
+    }
+    if (!panel || !list) return;
+    const refs = (draft?.provenance || []).slice(0, 3);
+    if (!draft || mode === 'RAG-OFF' || !refs.length) {
+      panel.hidden = true;
+      list.replaceChildren();
+      return;
+    }
+    panel.hidden = false;
+    list.replaceChildren(...refs.map(ref => {
+      const item = node('li');
+      if (ref.thumbnail) {
+        const img = node('img');
+        img.src = ref.thumbnail;
+        img.alt = '';
+        img.width = 72;
+        img.height = 51;
+        item.append(img);
+      }
+      const meta = node('div');
+      meta.append(node('strong', ref.filename || ref.title || ref.id));
+      if (ref.title && ref.filename) meta.append(node('span', ref.title));
+      item.append(meta);
+      return item;
+    }));
+  }
+
   function renderBoard() {
     const version=current(); if(!version)return;
     const draft=version.draft, art=$('board-art'); art.replaceChildren(); art.className=`board-art layout-${version.layout}`;
@@ -114,7 +153,7 @@
     $('empty-state').hidden=!!current();$('board-workspace').hidden=!current();
     if(!current())return;
     $('version-select').replaceChildren(...state.versions.map((v,i)=>{const option=node('option',`Draft ${i+1}`);option.value=i;return option;}));$('version-select').value=state.current;
-    renderBoard();buildEditor();showReview();syncTypographyControls();writeProposal=null;$('writing-proposal').hidden=true;
+    renderBoard();buildEditor();showReview();syncTypographyControls();showRefs(current()?.draft);writeProposal=null;$('writing-proposal').hidden=true;
   }
   async function fileData(file) { return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the selected file.'));reader.readAsDataURL(file);}); }
   for(const name of ['hero','logo']){
@@ -132,12 +171,14 @@
     $(`remove-${name}`).addEventListener('click',async()=>{try{await craftReady;if(name==='hero'){await craft.clearSource();state.heroSource=null;}state[name]='';$(`${name}-upload`).value='';$(`remove-${name}`).hidden=true;if(current())current().approved=false;renderBoard();if(current())showReview();await persist();}catch(error){$('save-status').textContent=error.message;}});
   }
   INPUTS.forEach(id=>$(id).addEventListener('input',()=>{scheduleSave();if(id==='color'&&current()){current().draft.color=$('color').value;current().approved=false;renderBoard();}}));
+
+  document.querySelectorAll('input[name="rag-mode"]').forEach(input=>input.addEventListener('change',()=>{if(current())showRefs({...current().draft,rag_mode:ragLabel(),use_rag:ragEnabled(),provenance:ragEnabled()?current().draft.provenance:[]});$('generation-status').textContent=`Next generate will run as ${ragLabel()}.`;scheduleSave();}));
   $('brief-form').addEventListener('submit',async event=>{
     event.preventDefault();if(busy)return;
     if($('brief').value.trim().length<30){$('generation-status').textContent='Add a few sentences about the problem, idea and what happened.';$('brief').focus();return;}
     busy=true;$('generate').disabled=true;$('working-state').hidden=false;$('empty-state').hidden=true;$('board-workspace').hidden=true;
     $('working-state').scrollIntoView({block:'center',behavior:'smooth'});$('generation-status').textContent='Designing your board. You can keep editing the brief; this draft uses the text submitted now.';persist();
-    try{const draft=await api('/api/create-board',{...inputs(),has_image:!!state.hero});state.versions.push({draft,layout:draft.layout,typography:{preset:'editorial',scale:1,leading:1,tracking:0,spacing:1},approved:false,imageFit:'contain',imagePosition:'center',created:new Date().toISOString()});state.current=state.versions.length-1;showVersion();persist();$('generation-status').textContent='Your draft is ready. Try a treatment, refine the wording, then review.';}
+    try{const draft=await api('/api/create-board',{...inputs(),has_image:!!state.hero,use_rag:ragEnabled()});state.versions.push({draft,layout:draft.layout,typography:{preset:'editorial',scale:1,leading:1,tracking:0,spacing:1},approved:false,imageFit:'contain',imagePosition:'center',created:new Date().toISOString()});state.current=state.versions.length-1;showVersion();persist();$('generation-status').textContent='Your draft is ready. Try a treatment, refine the wording, then review.';}
     catch(error){$('generation-status').textContent=error.message;showVersion();}
     finally{busy=false;$('working-state').hidden=true;$('generate').disabled=!aiAvailable;}
   });
@@ -148,7 +189,7 @@
   $('remove-font').addEventListener('click',async()=>{state.font='';$('font-upload').value='';await installFont();if(current())current().approved=false;renderBoard();persist();});
   $('font-upload').addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>8_000_000||!/\.(otf|ttf|woff2?)$/i.test(file.name))throw new Error('Choose a font file under 8 MB.');state.font=await fileData(file);await installFont();if(current())current().approved=false;renderBoard();persist();}catch(error){$('save-status').textContent=error.message;}});
   function encodeText(text){const bytes=new TextEncoder().encode(text);let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(binary);}
-  async function saveFile(format,data,statusId){const result=await api('/api/export',{format,data});const link=node('a',`Download ${format==='json'?'project':format.toUpperCase()}`);link.href=result.url;link.download=result.filename;link.target='_blank';link.rel='noopener';(format==='json'?$('save-links'):$('download-links')).append(link);$(statusId).textContent='Saved on this Mac. Use the download link to choose your own copy.';link.click();}
+  async function saveFile(format,data,statusId){const result=await api('/api/export',{format,data});const link=node('a',`Download ${format==='json'?'project':format.toUpperCase()}`);link.href=result.url;const mode=(current()?.draft?.rag_mode||ragLabel()).replace('-', '');link.download=(result.filename||`awards-board.${format}`).replace(/(\.[^.]+)$/, `-${current()?.draft?.rag_mode||ragLabel()}$1`);link.target='_blank';link.rel='noopener';(format==='json'?$('save-links'):$('download-links')).append(link);$(statusId).textContent='Saved on this Mac. Use the download link to choose your own copy.';link.click();}
   $('save-project').addEventListener('click',async()=>{
     try{
       await craftReady;if(projectChanging)throw new Error('Wait for the project to finish opening before saving.');state.inputs=inputs();const origin=state,snapshot=await craft.currentImage();if(projectChanging||state!==origin)throw new Error('The project changed while preparing its backup. Save the current project again.');const recovered=ImageCraft.reconcileHero(state,snapshot);state=recovered.state;if(recovered.changed){renderBoard();if(current())showReview();persist();}
@@ -181,7 +222,7 @@
   $('load-example').addEventListener('click',()=>{if($('brief').value.trim()){$('generation-status').textContent='Your brief is already filled in. Save it before replacing it with an example.';return;}$('brand').value='REFILL';$('campaign').value='The next refill';$('brief').value='FICTIONAL DEMO. People want to cut single-use plastic but often forget their reusable bottles. REFILL placed refill stations at a community arts festival and added simple signs at food stalls, reminding visitors to refill. The idea was to make a refill the easiest next step. The activation used reusable bottles, festival maps and clear directional signs. No measured campaign results are available.';$('color').value='#dc5737';persist();$('generation-status').textContent='Fictional example loaded. Select Generate my board.';});
   ['preset','scale','leading','tracking','spacing'].forEach(key=>$(`type-${key}`).addEventListener('input',()=>{if(!current())return;current().typography={...typographySettings(),[key]:key==='preset'?$(`type-${key}`).value:Number($(`type-${key}`).value)};current().approved=false;renderBoard();scheduleSave();}));
   $('reset-type').addEventListener('click',()=>{if(!current())return;current().typography={preset:'editorial',scale:1,leading:1,tracking:0,spacing:1};current().approved=false;syncTypographyControls();renderBoard();persist();});
-  $('ask-writer').addEventListener('click',async()=>{if(!current())return;const version=current();const field=$('writing-field').value;const original=version.draft[field];$('ask-writer').disabled=true;$('writing-status').textContent='Crafting an alternative from your campaign facts…';$('writing-proposal').hidden=true;try{const proposal=await api('/api/refine-copy',{campaign:version.draft.input_snapshot,field,current_text:original,action:$('writing-action').value,intent:$('writing-intent').value,results_verified:$('writer-results-verified').checked});writeProposal={proposal,version,original};version.writing_events??=[];version.writing_events.push({field,action:'proposed',proposal,evidence:proposal.evidence,at:new Date().toISOString()});scheduleSave();$('proposed-copy').textContent=proposal.proposed_text;$('writing-rationale').textContent=proposal.rationale;$('writing-evidence').replaceChildren(...(proposal.evidence||[]).map(e=>node('li',`${e.source}: “${e.excerpt}”`)),...(proposal.missing||[]).map(m=>node('li',`To confirm: ${m}`)));$('writing-proposal').hidden=false;$('writing-status').textContent=proposal.is_interpretation?'Suggested interpretation: review before applying.':'Suggested wording: review before applying.';}catch(error){$('writing-status').textContent=error.message;}finally{$('ask-writer').disabled=false;}});
+  $('ask-writer').addEventListener('click',async()=>{if(!current())return;const version=current();const field=$('writing-field').value;const original=version.draft[field];$('ask-writer').disabled=true;$('writing-status').textContent='Crafting an alternative from your campaign facts…';$('writing-proposal').hidden=true;try{const proposal=await api('/api/refine-copy',{campaign:version.draft.input_snapshot,field,current_text:original,action:$('writing-action').value,intent:$('writing-intent').value,results_verified:$('writer-results-verified').checked,use_rag:ragEnabled()});writeProposal={proposal,version,original};version.writing_events??=[];version.writing_events.push({field,action:'proposed',proposal,evidence:proposal.evidence,at:new Date().toISOString()});scheduleSave();$('proposed-copy').textContent=proposal.proposed_text;$('writing-rationale').textContent=proposal.rationale;$('writing-evidence').replaceChildren(...(proposal.evidence||[]).map(e=>node('li',`${e.source}: “${e.excerpt}”`)),...(proposal.missing||[]).map(m=>node('li',`To confirm: ${m}`)));$('writing-proposal').hidden=false;$('writing-status').textContent=proposal.is_interpretation?'Suggested interpretation: review before applying.':'Suggested wording: review before applying.';}catch(error){$('writing-status').textContent=error.message;}finally{$('ask-writer').disabled=false;}});
   $('apply-writing').addEventListener('click',()=>{if(!writeProposal)return;const {proposal,version,original}=writeProposal;if(current()!==version||version.draft[proposal.field]!==original){$('writing-status').textContent='This wording changed while the assistant was working. Request a fresh suggestion to keep your edits.';return;}version.draft[proposal.field]=proposal.proposed_text;version.approved=false;version.writing_history??=[];version.writing_events??=[];version.writing_events.push({field:proposal.field,action:'accepted',at:new Date().toISOString()});version.writing_history.push({field:proposal.field,before:original,after:proposal.proposed_text,evidence:proposal.evidence,action:'accepted',at:new Date().toISOString()});renderBoard();buildEditor();showReview();persist();$('writing-proposal').hidden=true;$('writing-status').textContent='Suggested wording applied. You can edit it further or restore the previous wording.';});
   $('reject-writing').addEventListener('click',()=>{if(writeProposal){writeProposal.version.writing_events??=[];writeProposal.version.writing_events.push({field:writeProposal.proposal.field,action:'rejected',at:new Date().toISOString()});persist();}$('writing-proposal').hidden=true;writeProposal=null;$('writing-status').textContent='Kept your existing wording.';});
   $('undo-writing').addEventListener('click',()=>{const version=current();const last=version?.writing_history?.at(-1);if(!last){$('writing-status').textContent='No accepted writing suggestion to undo.';return;}if(version.draft[last.field]!==last.after){$('writing-status').textContent='You edited this wording after applying the suggestion. Your newer changes are kept.';return;}version.draft[last.field]=last.before;version.writing_history.pop();version.approved=false;renderBoard();buildEditor();persist();$('writing-status').textContent='Previous wording restored.';});

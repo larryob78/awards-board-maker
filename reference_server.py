@@ -51,7 +51,8 @@ class Corpus:
         self.records = {}
         self.image_count = 0
         self.text_count = 0
-        board_dir = Path(config.get('board_dir', '__missing__')).expanduser().resolve()
+        corpus_path = os.environ.get('CORPUS_PATH') or config.get('board_dir') or config.get('board_dir') or '__missing__'
+        board_dir = Path(corpus_path).expanduser().resolve()
         metadata = {}
         csv_path = Path(config.get('metadata_csv', '__missing__')).expanduser()
         if csv_path.is_file():
@@ -85,7 +86,7 @@ class Corpus:
                           agency=row.get('agency', ''), award=row.get('highestAward', ''),
                           source=source_url(row.get('campaignUrl', '')),
                           text_source=source_url(entry.get('url', '')),
-                          description=description[:16000], path=path)
+                          description=description[:16000], path=path, filename=path.name)
             # Title and brand have extra weight; image pixels are not text-indexed.
             search_text = ' '.join([title] * 3 + [record['brand']] * 2 +
                                    [record['agency'], year, record['award'], description])
@@ -96,7 +97,7 @@ class Corpus:
         self.avg_length = sum(r['length'] for r in self.records.values()) / max(1, len(self.records)) or 1
 
     def public(self, row):
-        return {**{key: row[key] for key in ('id', 'title', 'year', 'brand', 'agency', 'award', 'source', 'text_source')},
+        return {**{key: row[key] for key in ('id', 'title', 'year', 'brand', 'agency', 'award', 'source', 'text_source', 'filename')},
                 'thumbnail': f'/api/boards/{row["id"]}/thumbnail',
                 'image': f'/api/boards/{row["id"]}/image',
                 'description': row['description'][:800],
@@ -249,12 +250,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_data(200, capabilities)
         if path == '/api/status':
             learned = library(corpus.config)
+            corpus_path = os.environ.get('CORPUS_PATH') or corpus.config.get('board_dir') or corpus.config.get('board_dir') or ''
             return self.send_data(200, {'campaigns': len(corpus.records), 'images': corpus.image_count,
                                        'descriptions': corpus.text_count, 'label': corpus.config.get('source_label', 'Reference boards'),
                                        'retrieval': 'Keyword search over campaign metadata and available descriptions',
                                        'ai_available': bool(api_key(corpus.config)),
                                        'image_model': IMAGE_MODEL, 'image_configured': image_configured(corpus.config),
-                                       'learning': learned.get('coverage', {}), 'principle_count': len(learned.get('principles', []))})
+                                       'learning': learned.get('coverage', {}), 'principle_count': len(learned.get('principles', [])),
+                                       'corpus_configured': bool(corpus.records), 'corpus_path_set': bool(str(corpus_path).strip() and str(corpus_path) != '__missing__'),
+                                       'rag_default': True})
         image_job = re.fullmatch(r'/api/image-jobs/([a-f0-9]{32})', path)
         if image_job:
             try:
