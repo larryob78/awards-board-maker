@@ -51,7 +51,7 @@ class Corpus:
         self.records = {}
         self.image_count = 0
         self.text_count = 0
-        corpus_path = os.environ.get('CORPUS_PATH') or config.get('board_dir') or config.get('board_dir') or '__missing__'
+        corpus_path = os.environ.get('CORPUS_PATH') or config.get('board_dir') or '__missing__'
         board_dir = Path(corpus_path).expanduser().resolve()
         metadata = {}
         csv_path = Path(config.get('metadata_csv', '__missing__')).expanduser()
@@ -250,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_data(200, capabilities)
         if path == '/api/status':
             learned = library(corpus.config)
-            corpus_path = os.environ.get('CORPUS_PATH') or corpus.config.get('board_dir') or corpus.config.get('board_dir') or ''
+            corpus_path = os.environ.get('CORPUS_PATH') or corpus.config.get('board_dir') or ''
             return self.send_data(200, {'campaigns': len(corpus.records), 'images': corpus.image_count,
                                        'descriptions': corpus.text_count, 'label': corpus.config.get('source_label', 'Reference boards'),
                                        'retrieval': 'Keyword search over campaign metadata and available descriptions',

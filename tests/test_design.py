@@ -205,5 +205,34 @@ class DesignTests(unittest.TestCase):
         self.assertFalse((self.root / 'reference-data/exports').exists())
 
 
+    def test_rag_toggle_skips_retrieval_and_records_mode(self):
+        class TrackingCorpus(FakeCorpus):
+            def search(self, query):
+                self.searched = query
+                return [{'id': 'ref-1', 'title': 'Example', 'source': 'https://example.test', 'year': '2024', 'filename': '2024_ref-1_Example.jpg', 'thumbnail': '/api/boards/ref-1/thumbnail'}]
+            def image(self, board_id, size):
+                return b'jpeg-bytes'
+        corpus = TrackingCorpus({'principles_file': str(self.root / 'absent.json'), 'model': 'test-model'})
+        with patch('design_engine.model_json', return_value=copy.deepcopy(self.raw)) as model:
+            off = create_board(corpus, {**self.inputs, 'use_rag': False}, 'fake-key')
+        self.assertEqual(off['rag_mode'], 'RAG-OFF')
+        self.assertFalse(off['use_rag'])
+        self.assertEqual(off['provenance'], [])
+        self.assertFalse(hasattr(corpus, 'searched'))
+        sent = json.loads(model.call_args.args[3][0]['text'])
+        self.assertEqual(sent['rag_mode'], 'RAG-OFF')
+        with patch('design_engine.model_json', return_value=copy.deepcopy(self.raw)):
+            on = create_board(corpus, {**self.inputs, 'use_rag': True}, 'fake-key')
+        self.assertEqual(on['rag_mode'], 'RAG-ON')
+        self.assertTrue(on['use_rag'])
+        self.assertEqual(on['provenance'][0]['id'], 'ref-1')
+        self.assertEqual(on['provenance'][0]['filename'], '2024_ref-1_Example.jpg')
+        self.assertTrue(hasattr(corpus, 'searched'))
+
+    def test_use_rag_must_be_boolean(self):
+        with self.assertRaises(ValueError):
+            validate_input({**self.inputs, 'use_rag': 'yes'})
+
+
 if __name__ == '__main__':
     unittest.main()

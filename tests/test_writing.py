@@ -133,5 +133,21 @@ class WritingTests(unittest.TestCase):
         self.assertIn('no relevant corpus descriptions', result['learning_basis'])
 
 
+    def test_rag_off_skips_style_examples(self):
+        result, model = self.run_proposal(data={**self.data, 'use_rag': False})
+        self.assertEqual(result['rag_mode'], 'RAG-OFF')
+        self.assertFalse(result['use_rag'])
+        self.assertEqual(result['provenance'], [])
+        sent = json.loads(model.call_args.args[3][0]['text'])
+        self.assertEqual(sent['style_examples_not_campaign_facts'], [])
+        self.assertEqual(sent['rag_mode'], 'RAG-OFF')
+
+    def test_use_rag_must_be_boolean(self):
+        with patch('writing_engine.model_json') as model:
+            with self.assertRaises(ValueError):
+                refine_copy(FakeCorpus(), {**self.data, 'use_rag': 'on'}, 'fake-key')
+            model.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
