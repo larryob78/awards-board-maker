@@ -39,11 +39,17 @@
     // Coherent short, medium and long tiers. Text is never rewritten to fit.
     const headlineTier = headlineLength > 85 ? 0.78 : headlineLength > 55 ? 0.88 : 1;
     // Argument size 1: display headline. Floors keep hierarchy unmistakable.
-    const headlineSize = Math.max(54, ({ editorial: 76, impact: 90, story: 66 }[layout]) * headlineTier * settings.scale);
+    // Slightly stronger display bases; fit still floors at 54px and never shrinks body.
+    const headlineSize = Math.max(54, ({ editorial: 78, impact: 92, story: 68 }[layout]) * headlineTier * settings.scale);
     // Argument size 2: one shared body size for subhead, sections and proof.
     const bodySize = Math.max(20, (layout === 'impact' ? 20 : 21) * settings.scale);
     // Credits size: brand, campaign, section labels, footer.
     const creditSize = Math.max(10, 11 * Math.min(1, settings.scale));
+    // Impact (light on dark) needs a touch more leading/tracking for the same face.
+    const bodyLeadingFloor = layout === 'impact' ? 1.38 : 1.34;
+    const bodyTracking = layout === 'impact'
+      ? Math.max(0.005, settings.tracking * 0.25 + 0.008)
+      : Math.max(-0.005, settings.tracking * 0.25);
     const variables = {
       '--type-display': preset.display,
       '--type-body': preset.body,
@@ -52,15 +58,15 @@
       '--type-headline-leading': Math.max(0.98, preset.leading * settings.leading).toFixed(3),
       '--type-headline-tracking': `${(preset.tracking + settings.tracking).toFixed(4)}em`,
       '--type-body-size': `${bodySize.toFixed(2)}px`,
-      '--type-body-leading': Math.max(1.32, 1.45 * settings.leading).toFixed(3),
-      '--type-body-tracking': `${Math.max(-0.005, settings.tracking * 0.25).toFixed(4)}em`,
+      '--type-body-leading': Math.max(bodyLeadingFloor, 1.45 * settings.leading).toFixed(3),
+      '--type-body-tracking': `${bodyTracking.toFixed(4)}em`,
       // Subhead shares argument size 2 (body). Only leading differs slightly via CSS.
       '--type-subhead-size': `${bodySize.toFixed(2)}px`,
       '--type-credit-size': `${creditSize.toFixed(2)}px`,
-      // Spacing scale (approx 4px base): generous section/column gaps, tighter heading gap.
-      '--type-section-gap': `${(28 * settings.spacing).toFixed(2)}px`,
+      // Spacing scale (approx 4px base): open section/column, keep heading gap tighter than section.
+      '--type-section-gap': `${(30 * settings.spacing).toFixed(2)}px`,
       '--type-heading-gap': `${(16 * settings.spacing).toFixed(2)}px`,
-      '--type-column-gap': `${(52 * settings.spacing).toFixed(2)}px`,
+      '--type-column-gap': `${(56 * settings.spacing).toFixed(2)}px`,
       '--type-margin': `${(56 * settings.spacing).toFixed(2)}px`
     };
     Object.entries(variables).forEach(([key, value]) => board.style.setProperty(key, value));

@@ -8,7 +8,7 @@
   --type-display: Georgia, "Times New Roman", serif;
   --type-body: Arial, Helvetica, sans-serif;
   --type-weight: 700;
-  --type-headline-size: 76px;
+  --type-headline-size: 78px;
   --type-headline-leading: 1.04;
   --type-headline-tracking: -.038em;
   --type-body-size: 21px;
@@ -16,9 +16,9 @@
   --type-body-tracking: 0em;
   --type-subhead-size: 21px;
   --type-credit-size: 11px;
-  --type-section-gap: 28px;
+  --type-section-gap: 30px;
   --type-heading-gap: 16px;
-  --type-column-gap: 52px;
+  --type-column-gap: 56px;
   --type-margin: 56px;
   --space-1: 8px;
   --space-2: 12px;
@@ -56,7 +56,7 @@
   font-weight: 400;
   line-height: 1.4;
   letter-spacing: -.01em;
-  max-width: 38ch;
+  max-width: 36ch;
   margin: 0;
   color: #2c382f;
   text-align: left;
@@ -93,10 +93,17 @@
 .board-art .art-proof {
   flex-shrink: 0;
   margin-top: auto;
-  border-top: 2px solid var(--board-accent);
+  border-top: 1px solid color-mix(in srgb, var(--board-accent) 72%, transparent);
   padding-top: var(--space-3);
+  /* Proof supports the idea; keep size, lower visual noise. */
+  opacity: .92;
 }
-.board-art .art-proof p { font-variant-numeric: lining-nums tabular-nums; }
+.board-art .art-proof h3 { opacity: .68; letter-spacing: .12em; }
+.board-art .art-proof p {
+  font-variant-numeric: lining-nums tabular-nums;
+  color: #2a342c;
+  max-width: 40ch;
+}
 .board-art .art-brand {
   font-size: calc(var(--type-credit-size) + 2px);
   font-weight: 700;
@@ -109,14 +116,20 @@
   font-weight: 400;
   letter-spacing: .1em;
   line-height: 1.35;
-  margin: var(--space-3) 0 var(--space-2);
+  /* More space above the display than below (craft-floor heading rhythm). */
+  margin: var(--space-4) 0 var(--space-2);
   text-align: left;
+  opacity: .82;
 }
 .board-art .art-footer {
   font-size: var(--type-credit-size);
   font-weight: 400;
   letter-spacing: .08em;
   text-align: left;
+  left: var(--type-margin);
+  right: var(--type-margin);
+  bottom: calc(var(--space-3) + 4px);
+  opacity: .78;
 }
 .board-art .art-footer .review-watermark { font-weight: 700; }
 .board-art .art-wordmark {
@@ -142,12 +155,30 @@
 .board-art.layout-story .art-proof p { font-size: var(--type-body-size); }
 .board-art.layout-editorial .art-content { gap: var(--type-column-gap); padding-top: var(--space-5); }
 .board-art.layout-editorial .art-headline { max-width: 18ch; }
-.board-art.layout-impact .art-proof { border-top-color: var(--board-accent); }
+.board-art.layout-impact .art-proof { border-top-color: color-mix(in srgb, var(--board-accent) 65%, #f7f5e9); }
 .board-art.layout-impact .art-wordmark { writing-mode: horizontal-tb; font-size: 145px; font-weight: var(--type-weight); }
 .board-art.layout-impact .art-headline { max-width: 16ch; }
 .board-art.layout-impact .art-section p,
 .board-art.layout-impact .art-proof p,
 .board-art.layout-impact .art-subhead { color: #e8ebe2; }
+.board-art.layout-impact .art-proof { opacity: .88; }
+.board-art.layout-impact .art-proof p { color: #d5dbc0; }
+.board-art.layout-impact .art-campaign { color: #c9d2c0; opacity: .9; }
+.board-art.layout-impact .art-content { padding-top: var(--space-5); gap: var(--type-column-gap); }
+.board-art.layout-editorial .art-top,
+.board-art.layout-story .art-top {
+  padding-bottom: var(--space-4);
+  margin-bottom: 0;
+}
+.board-art.layout-story .art-proof {
+  border-top-width: 1px;
+  opacity: .9;
+  padding-top: var(--space-3);
+}
+/* Studio chrome: keep RAG control untouched; only align badge with draft state. */
+.design-toolbar { flex-wrap: wrap; row-gap: 10px; }
+.draft-label { letter-spacing: .02em; }
+.rag-badge { flex: 0 0 auto; }
 .typography-help { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 8px 0 0; }
 .typography-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 18px; }
 .typography-controls label { font-size: 12px; }
