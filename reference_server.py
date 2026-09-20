@@ -346,16 +346,20 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.server.generation_lock.acquire(blocking=False):
                     return self.send_data(429, {'error': 'A board is already being designed. Please wait.'})
                 try:
-                    return self.send_data(200, create_board(self.server.corpus, data, api_key(self.server.corpus.config)))
+                    # Release before writing the response so ThreadingHTTPServer
+                    # cannot leave the lock held after the client has returned.
+                    draft = create_board(self.server.corpus, data, api_key(self.server.corpus.config))
                 finally:
                     self.server.generation_lock.release()
+                return self.send_data(200, draft)
             if self.path == '/api/refine-copy':
                 if not self.server.generation_lock.acquire(blocking=False):
                     return self.send_data(429, {'error': 'The assistant is already working. Please wait.'})
                 try:
-                    return self.send_data(200, refine_copy(self.server.corpus, data, api_key(self.server.corpus.config)))
+                    proposal = refine_copy(self.server.corpus, data, api_key(self.server.corpus.config))
                 finally:
                     self.server.generation_lock.release()
+                return self.send_data(200, proposal)
             if self.path == '/api/search':
                 query = data.get('query')
                 if not isinstance(query, str) or not 1 <= len(query.strip()) <= 500:
@@ -376,9 +380,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_data(429, {'error': 'One guidance request is already running. Please wait.'})
             try:
                 result = generate(self.server.corpus, ids, board, request_text)
-                self.send_data(200, result)
             finally:
                 self.server.generation_lock.release()
+            return self.send_data(200, result)
         except (ValueError, json.JSONDecodeError) as error:
             self.send_data(400, {'error': str(error)})
         except RuntimeError as error:
