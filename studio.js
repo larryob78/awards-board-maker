@@ -4,7 +4,10 @@
   const INPUTS = ['brand','campaign','brief','results','mandatories','direction','color'];
   const COPY = ['headline','subhead','context','insight','idea','execution','results'];
   const LABELS = {headline:'Headline',subhead:'Supporting line',context:'Problem / context',insight:'Insight',idea:'The idea',execution:'Execution',results:'Results'};
+  const EXAMPLE = new URLSearchParams(location.search).has('example');
   const STORAGE = 'awards-board-studio-v1';
+  const POINTER = EXAMPLE ? STORAGE+'-example' : STORAGE;
+  const BOARD_KEY = EXAMPLE ? 'board:example' : 'board:main';
   let state = {format:STORAGE,inputs:{},hero:'',logo:'',font:'',versions:[],current:0};
   let busy = false;
   let aiAvailable = false;
@@ -22,9 +25,9 @@
     state.inputs=inputs();
     const snapshot=structuredClone(state);
     saveQueue=saveQueue.catch(()=>{}).then(async()=>{
-      await ImageCraft.storage.putMany([['board:main',snapshot]]);
+      await ImageCraft.storage.putMany([[BOARD_KEY,snapshot]]);
       const pointer={...snapshot,hero:'',logo:'',font:'',largeAssetsInDB:true};
-      localStorage.setItem(STORAGE,JSON.stringify(pointer));
+      localStorage.setItem(POINTER,JSON.stringify(pointer));
       $('save-status').textContent='Saved locally in this browser. Save project keeps a separate copy with image history.';
     }).catch(error=>{$('save-status').textContent='Local saving needs attention. Keep this tab open and use Save project. '+error.message;throw error;});
     // Event handlers may ignore the promise; still keep the recoverable error visible.
@@ -106,6 +109,7 @@
 
   function renderBoard() {
     const version=current(); if(!version)return;
+    const caption=document.querySelector('.canvas-caption span');if(caption)caption.textContent=version.demo?'Fictional concept · editable example':'Your campaign board';
     const draft=version.draft, art=$('board-art'); art.replaceChildren(); art.className=`board-art layout-${version.layout}`;
     art.style.setProperty('--board-accent',draft.color); art.style.setProperty('--accent-ink',accentInk(draft.color));
     art.style.setProperty('--image-fit',version.imageFit||'contain');art.style.setProperty('--image-position',version.imagePosition||'center');
@@ -153,10 +157,11 @@
   function selectCopy(field) {
     selectedCopy=field;$('selection-inspector').hidden=false;
     $('selection-label').textContent=LABELS[field];$('selection-copy').value=current().draft[field];
+    $('copy-editor').hidden=true;
     $('selection-copy').maxLength=field==='results'?550:field==='headline'?85:field==='subhead'?170:field==='execution'?340:280;
-    $('selection-copy').focus();
+    openTool('story');$('selection-inspector').hidden=false;$('selection-copy').focus();
   }
-  $('close-selection').addEventListener('click',()=>{$('selection-inspector').hidden=true;selectedCopy=null;});
+  $('close-selection').addEventListener('click',()=>{$('selection-inspector').hidden=true;$('copy-editor').hidden=false;selectedCopy=null;});
   $('selection-copy').addEventListener('input',()=>{if(!current()||!selectedCopy)return;current().draft[selectedCopy]=$('selection-copy').value;current().approved=false;renderBoard();buildEditor();showReview();scheduleSave();});
   $('start-manual').addEventListener('click',async()=>{
     await craftReady;
@@ -245,20 +250,56 @@
   $('apply-writing').addEventListener('click',()=>{if(!writeProposal)return;const {proposal,version,original}=writeProposal;if(current()!==version||version.draft[proposal.field]!==original){$('writing-status').textContent='This wording changed while the assistant was working. Request a fresh suggestion to keep your edits.';return;}version.draft[proposal.field]=proposal.proposed_text;version.approved=false;version.writing_history??=[];version.writing_events??=[];version.writing_events.push({field:proposal.field,action:'accepted',at:new Date().toISOString()});version.writing_history.push({field:proposal.field,before:original,after:proposal.proposed_text,evidence:proposal.evidence,action:'accepted',at:new Date().toISOString()});renderBoard();buildEditor();showReview();persist();$('writing-proposal').hidden=true;$('writing-status').textContent='Suggested wording applied. You can edit it further or restore the previous wording.';});
   $('reject-writing').addEventListener('click',()=>{if(writeProposal){writeProposal.version.writing_events??=[];writeProposal.version.writing_events.push({field:writeProposal.proposal.field,action:'rejected',at:new Date().toISOString()});persist();}$('writing-proposal').hidden=true;writeProposal=null;$('writing-status').textContent='Kept your existing wording.';});
   $('undo-writing').addEventListener('click',()=>{const version=current();const last=version?.writing_history?.at(-1);if(!last){$('writing-status').textContent='No accepted writing suggestion to undo.';return;}if(version.draft[last.field]!==last.after){$('writing-status').textContent='You edited this wording after applying the suggestion. Your newer changes are kept.';return;}version.draft[last.field]=last.before;version.writing_history.pop();version.approved=false;renderBoard();buildEditor();persist();$('writing-status').textContent='Previous wording restored.';});
-  $('design-heading').textContent='Campaign board';
-  $('design-heading').closest('.design-toolbar').after($('board-workspace'));
-  $('board-workspace').prepend(document.querySelector('.layout-bar'));
+  // The app frame reuses inspected Napkin Circle colours and circle-button dimensions.
+  const header=document.querySelector('.app-header');header.replaceChildren();
+  const brand=node('strong','napkin');brand.append(node('span','◯','circle-wordmark'));
+  const title=node('span','Awards board','workspace-title');
+  const saved=node('span','Browser draft · checking…','saved-indicator');saved.id='circle-save-state';
+  const files=node('button','File');files.type='button';files.className='circle-file';
+  const example=node('a','Fictional example');example.href='?example=1';example.className='example-link';
+  header.append(brand,title,saved,example,files);
+  const rail=node('nav',undefined,'circle-rail');rail.setAttribute('aria-label','Board tools');
+  const drawer=node('aside',undefined,'circle-drawer');drawer.hidden=true;
+  const drawerHead=node('div',undefined,'drawer-heading');const drawerTitle=node('h2','Story');const close=node('button','Close');close.type='button';drawerHead.append(drawerTitle,close);drawer.append(drawerHead);
+  const groups={};
+  for(const [key,label] of [['story','Story'],['image','Image'],['type','Type'],['file','File']]){
+    const group=node('div',undefined,'inspector-group');group.hidden=true;drawer.append(group);groups[key]=group;
+    if(key!=='file'){const button=node('button',undefined,'circle-tool');button.type='button';button.dataset.tool=key;button.setAttribute('aria-label',label);button.append(node('span',key==='story'?'Aa':key==='image'?'▧':'T','circle-tool-disc'),node('span',label));button.addEventListener('click',()=>openTool(key));rail.append(button);}
+  }
+  function move(selector,target){const el=document.querySelector(selector);if(el)target.append(el);}
+  move('#selection-inspector',groups.story);move('#copy-editor',groups.story);move('.writing-panel',groups.story);
+  const assets=document.querySelector('.asset-fields');groups.image.append(assets);move('#image-craft-panel',groups.image);move('.refine-bar',groups.image);
+  move('.layout-bar',groups.type);move('.type-panel',groups.type);
+  move('.project-tools',groups.file);move('#save-status',groups.file);move('#save-links',groups.file);move('.export-bar',groups.file);move('#export-status',groups.file);move('#download-links',groups.file);move('.review-panel',groups.file);
+  const advanced=node('details');advanced.append(node('summary','Campaign notes and connections'));advanced.append(document.querySelector('.brief-panel'));groups.story.append(advanced);
+  const canvas=document.querySelector('.design-panel');canvas.prepend(rail);canvas.after(drawer);
+  const toolbar=document.querySelector('.design-toolbar');toolbar.hidden=true;
+  const hint=node('div',undefined,'canvas-caption');hint.append(node('span',EXAMPLE?'Fictional concept · editable example':'Your campaign board'),node('span','Select wording to edit'));canvas.prepend(hint);
+  function openTool(key){drawer.hidden=false;Object.entries(groups).forEach(([name,group])=>group.hidden=name!==key);drawerTitle.textContent=key[0].toUpperCase()+key.slice(1);document.body.classList.add('inspector-open');rail.querySelectorAll('[data-tool]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tool===key)));if(key==='story'){ $('copy-editor').open=true;if(!selectedCopy)$('copy-editor').hidden=false;}requestAnimationFrame(resize);}
+  close.addEventListener('click',()=>{drawer.hidden=true;document.body.classList.remove('inspector-open');rail.querySelectorAll('[data-tool]').forEach(button=>button.setAttribute('aria-pressed','false'));resize();});
+  files.addEventListener('click',()=>openTool('file'));
+  $('open-image-craft').addEventListener('click',()=>openTool('image'));
+  const saveObserver=new MutationObserver(()=>{saved.textContent=$('save-status').textContent||'Browser draft · saved locally';});saveObserver.observe($('save-status'),{childList:true,subtree:true});
+  async function createExample(){
+    const response=await fetch('/demo-bottle.jpg');if(!response.ok)throw new Error('The example image could not load. Your own project is unchanged.');
+    const image=await fileData(await response.blob());
+    state.inputs={brand:'REFILL',campaign:'Make the next refill easy.',brief:'FICTIONAL CONCEPT. Demonstrate a refill reminder at a fictional arts festival. No activation or measured results are claimed.',results:'',color:'#355d73',mandatories:'Fictional concept only.',direction:'Restrained editorial, warm paper and blue product.'};
+    const draft={...state.inputs,headline:'One bottle.\nA better habit.',subhead:'Make the next refill easy.',context:'Reusable bottles only help when people remember to refill them.',insight:'The easiest next step is the one people can see.',idea:'Put the refill reminder where the next drink happens.',execution:'A proposed festival system: refill points, simple directional signs and a reusable bottle. Concept only; not deployed.',results:'Not measured. This is a fictional concept, not a live campaign.',missing:['Fictional example. No actual activation or results.'],applied_principles:[],rationale:'Editable fictional example with a separate synthetic hero. No reference-board assets or claims reused.',support:{},input_snapshot:{...state.inputs},layout:'editorial',use_rag:false,rag_mode:'RAG-OFF',provenance:[]};
+    state.versions.push({draft,manual:true,demo:true,layout:'editorial',typography:{preset:'modern',scale:1,leading:1,tracking:0,spacing:1},approved:false,imageFit:'cover',imagePosition:'center',created:new Date().toISOString()});state.current=state.versions.length-1;
+    await craft.attach(image,{kind:'generated',label:'Synthetic bottle · fictional concept'});state.hero=image;state.heroSource={kind:'generated',label:'Synthetic bottle · fictional concept'};
+    restoreInputs();showVersion();await persist();
+  }
   craftReady=(async()=>{
     try{
-      const saved=localStorage.getItem(STORAGE);
-      if(saved){const pointer=JSON.parse(saved);const stored=pointer.largeAssetsInDB?await ImageCraft.storage.get('board:main'):pointer;if(!stored)throw new Error('The local image database is missing. Open a saved project to recover its assets.');state=validateProject(stored);}
+      const saved=localStorage.getItem(POINTER);
+      if(saved){const pointer=JSON.parse(saved);const stored=pointer.largeAssetsInDB?await ImageCraft.storage.get(BOARD_KEY):pointer;if(!stored)throw new Error('The local image database is missing. Open a saved project to recover its assets.');state=validateProject(stored);}
       craft=await ImageCraft.mount({api,
         apply:async(image,source)=>{state.hero=image;state.heroSource=source;state.imageCraftId=craft.getProjectId();state.versions.forEach(v=>v.approved=false);$('remove-hero').hidden=false;renderBoard();if(current())showReview();await persist();},
         placement:()=>{const img=$('board-art').querySelector('.art-visual img');return img?{width:img.clientWidth,height:img.clientHeight,fit:current()?.imageFit||'contain'}:null;}
       });
       const recoverLegacy=!state.imageCraftId;state.imageCraftId=await craft.init(state.imageCraftId,state.hero,state.heroSource,recoverLegacy);
       const recovered=ImageCraft.reconcileHero(state,await craft.currentImage());state=recovered.state;
-      restoreInputs();await installFont();showVersion();restoring=false;await persist();if(recovered.changed)$('image-status').textContent='Recovered the saved image revision and reset board approval for review. Original images and history are preserved.';
+      restoreInputs();await installFont();showVersion();restoring=false;if((EXAMPLE||!saved)&&!current())await createExample();await persist();saved.textContent='Browser draft · saved locally';if(recovered.changed)$('image-status').textContent='Recovered the saved image revision and reset board approval for review. Original images and history are preserved.';
     }catch(error){restoring=false;$('save-status').textContent=error.message;$('image-status').textContent=error.message;throw error;}
   })();craftReady.catch(()=>{});
   new ResizeObserver(resize).observe($('board-fit'));

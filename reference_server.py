@@ -288,6 +288,7 @@ class Handler(BaseHTTPRequestHandler):
         assets.update({'/studio.js': ('studio.js', 'text/javascript'), '/studio.css': ('studio.css', 'text/css'),
                        '/image-craft.js': ('image-craft.js', 'text/javascript'),
                        '/typography.js': ('typography.js', 'text/javascript'),
+                       '/demo-bottle.jpg': ('demo-bottle.jpg', 'image/jpeg'),
                        '/classic': ('classic.html', 'text/html; charset=utf-8')})
         if path in assets:
             filename, mime = assets[path]
