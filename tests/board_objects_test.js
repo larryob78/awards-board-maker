@@ -1,0 +1,3 @@
+const test=require('node:test');const assert=require('node:assert/strict');require('../board-objects.js');
+test('fine nudge preserves width and original offsets',()=>{const original={x:12.5,y:6,width:300};assert.deepEqual(BoardObjects.nudge(original,1,-1),{x:13.5,y:5,width:300});assert.deepEqual(original,{x:12.5,y:6,width:300});});
+test('imported geometry stays finite and bounded without guessing a width',()=>{assert.deepEqual(BoardObjects.normalise({x:Infinity,y:NaN}),{x:0,y:0});assert.deepEqual(BoardObjects.normalise({x:9000,y:-4000,width:0}),{x:1400,y:-990,width:80});assert.deepEqual(BoardObjects.normalise(),{x:0,y:0});});
