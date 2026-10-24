@@ -1,4 +1,5 @@
 """Local reference retrieval and image-grounded guidance for Awards Board Maker."""
+from eps_preview import convert_eps
 from export_preflight import encode_candidates
 import argparse
 import base64
@@ -270,6 +271,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_data(502, {'error': str(error)})
             except Exception:
                 return self.send_data(502, {'error': 'Image status unavailable. Your task is retained.'})
+        eps_original = re.fullmatch(r'/api/eps-originals/([a-f0-9]{64})\.eps', path)
+        if eps_original:
+            saved = ROOT / 'reference-data' / 'eps-originals' / (eps_original[1] + '.eps')
+            if saved.is_file():
+                return self.send_data(200, saved.read_bytes(), 'application/postscript')
+            return self.send_data(404, {'error': 'Original EPS not found. Open the saved project or upload the original again.'})
         download = re.fullmatch(r'/api/download/([a-f0-9]{32})\.(png|pdf|json|jpg)', path)
         if download:
             saved = ROOT / 'reference-data' / 'exports' / f'{download[1]}.{download[2]}'
@@ -306,12 +313,30 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get('Content-Length', '0'))
             # A 20 MP lossless RGBA source can approach 84 MB; its base64 form
             # plus an 8 MB selection mask needs a larger bound than board export.
-            maximum = 125_000_000 if self.path in {'/api/create-image', '/api/export-cannes'} else 30_000_000 if self.path == '/api/export' else 40000
+            maximum = 125_000_000 if self.path in {'/api/create-image', '/api/export-cannes'} else 30_000_000 if self.path == '/api/export' else 12_000_000 if self.path == '/api/convert-eps' else 40000
             if not 0 < length <= maximum:
                 raise ValueError('Request is too large or empty.')
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
                 raise ValueError('Expected a JSON object.')
+            if self.path == '/api/convert-eps':
+                encoded = data.get('data')
+                if not isinstance(encoded, str):
+                    raise ValueError('Choose an EPS logo file.')
+                try:
+                    original = base64.b64decode(encoded, validate=True)
+                except ValueError:
+                    raise ValueError('Invalid EPS upload.') from None
+                preview = convert_eps(original)
+                directory = ROOT / 'reference-data' / 'eps-originals'
+                directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+                filename = preview['source_sha256'] + '.eps'
+                path = directory / filename
+                if not path.exists():
+                    path.write_bytes(original)
+                    path.chmod(0o600)
+                preview['original_url'] = '/api/eps-originals/' + filename
+                return self.send_data(200, preview)
             if self.path == '/api/export-cannes':
                 encoded = data.get('data')
                 if not isinstance(encoded, str):
