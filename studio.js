@@ -278,7 +278,7 @@
   const example=node('a','Fictional example');example.href='?example=1';example.className='example-link';
   const undo=node('button','Undo');undo.type='button';undo.className='circle-file';undo.addEventListener('click',undoBoard);header.append(brand,title,saved,example,undo,files);
   const rail=node('nav',undefined,'circle-rail');rail.setAttribute('aria-label','Board tools');
-  const drawer=node('aside',undefined,'circle-drawer');drawer.hidden=true;
+  const drawer=node('aside',undefined,'circle-drawer');drawer.hidden=true;document.body.append(drawer);
   const drawerHead=node('div',undefined,'drawer-heading');const drawerTitle=node('h2','Story');const close=node('button','Close');close.type='button';drawerHead.append(drawerTitle,close);drawer.append(drawerHead);
   const groups={};
   for(const [key,label] of [['story','Story'],['image','Image'],['type','Type'],['file','File']]){
