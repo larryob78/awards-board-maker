@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Awards Board Studio</title>
   <link rel="stylesheet" href="studio.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <script src="typography.js" defer></script>
   <script src="image-craft.js" defer></script>
   <script src="studio.js" defer></script>
 </head>
-<body>
+<body class="workspace-loading">
+  <p id="workspace-loading" class="workspace-loading-note" role="status">Opening your saved board…</p>
+  <noscript>This editable board needs JavaScript enabled. Your saved project remains on this browser.</noscript>
   <header class="app-header"><div><strong>Awards Board <span>Studio</span></strong><small>Good ideas, clearly presented.</small></div><span class="header-note">Editable board · Human judgement</span></header>
   <main class="workspace">
     <aside class="brief-panel">

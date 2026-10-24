@@ -289,6 +289,8 @@ class Handler(BaseHTTPRequestHandler):
                        '/image-craft.js': ('image-craft.js', 'text/javascript'),
                        '/typography.js': ('typography.js', 'text/javascript'),
                        '/demo-bottle.jpg': ('demo-bottle.jpg', 'image/jpeg'),
+                       '/vendor/html2canvas-1.4.1.min.js': ('vendor/html2canvas-1.4.1.min.js', 'text/javascript'),
+                       '/vendor/jspdf-2.5.1.umd.min.js': ('vendor/jspdf-2.5.1.umd.min.js', 'text/javascript'),
                        '/classic': ('classic.html', 'text/html; charset=utf-8')})
         if path in assets:
             filename, mime = assets[path]
