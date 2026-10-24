@@ -120,6 +120,21 @@
       }
       if (!adjustments.length) adjustments.push('Headline reduced within its safe range; copy still needs attention.');
     }
+    // Recover spacing only after display fitting, never silently reduce body readability
+    // or change the supplied campaign words to make an export look successful.
+    if (!result.ok && result.measurable) {
+      const text = board.querySelector('.art-text');
+      if (text && text.scrollHeight > text.clientHeight + 3) {
+        text.style.gap = '8px';
+        board.style.setProperty('--type-heading-gap', '10px');
+        board.querySelectorAll('.art-section h3,.art-proof h3').forEach(label => { label.style.marginBottom = '6px'; });
+        const proof = board.querySelector('.art-proof');
+        if (proof) proof.style.paddingTop = '8px';
+        result = inspect(board);
+        board.dataset.spacingFit = 'compact';
+        adjustments.push('Section spacing tightened to recover copy room. Body size and campaign wording unchanged.');
+      }
+    }
     return { ...result, adjustments };
   }
 

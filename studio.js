@@ -131,9 +131,9 @@
       el.addEventListener('input',()=>{const field=el.dataset.copyField;const limit=field==='headline'?85:field==='subhead'?170:field==='execution'?340:field==='results'?550:280;const value=el.textContent.slice(0,limit);if(el.textContent!==value)el.textContent=value;current().draft[field]=value;current().approved=false;$('approve').checked=false;$('draft-state').textContent='Edited · Review needed';$('selection-copy').value=value;buildEditor();showReview();scheduleSave();requestAnimationFrame(checkQuality);});
       el.addEventListener('blur',()=>{checkQuality();});
     });
-    if(window.BoardTypography)BoardTypography.fit(art,typographySettings());
     for(const [field,size] of Object.entries(version.typeSizes||{})){if(COPY.includes(field)&&Number.isFinite(size)&&size>=12&&size<=140){const el=art.querySelector('[data-copy-field="'+field+'"]');if(el)el.style.fontSize=size+'px';}}
     const logo=art.querySelector('.art-logo');if(logo){logo.style.width=Math.max(40,Math.min(260,Number(state.logoWidth)||150))+'px';logo.style.height='auto';logo.style.maxHeight='64px';logo.style.objectFit='contain';logo.style.order=state.logoPlacement==='left'?'-1':'1';}
+    if(window.BoardTypography)BoardTypography.fit(art,typographySettings());
     resize(); requestAnimationFrame(()=>{checkQuality();craft?.quality();});
     document.querySelectorAll('[data-layout]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.layout===version.layout)));
     $('draft-state').textContent=version.approved?'Reviewed by you':(version.manual?'Manual draft · Review needed':'AI draft · Review needed');$('approve').checked=!!version.approved;
