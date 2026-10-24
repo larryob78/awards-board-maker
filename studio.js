@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const INPUTS = ['brand','campaign','brief','results','mandatories','direction','color'];
   const COPY = ['headline','subhead','context','insight','idea','execution','results'];
-  const LABELS = {headline:'Headline',subhead:'Supporting line',context:'Background',insight:'Insight',idea:'The idea',execution:'Execution',results:'Results'};
+  const LABELS = {headline:'Headline',subhead:'Supporting line',context:'Problem / context',insight:'Insight',idea:'The idea',execution:'Execution',results:'Results'};
   const STORAGE = 'awards-board-studio-v1';
   let state = {format:STORAGE,inputs:{},hero:'',logo:'',font:'',versions:[],current:0};
   let busy = false;
@@ -117,14 +117,15 @@
     if(state.hero){const img=node('img');img.src=state.hero;img.alt='Your campaign image';visual.append(img);}
     else {const letters=(draft.brand||draft.campaign||'IDEA').split(/\s+/).map(v=>v[0]).join('').slice(0,3).toUpperCase();visual.append(node('div',letters,'art-wordmark'));}
     if(state.hero&&state.heroSource?.kind==='generated')visual.append(node('span','AI concept image','art-generated'));
-    const text=node('div',undefined,'art-text');const heading=node('div',undefined,'art-heading');heading.append(node('h1',draft.headline,'art-headline'),node('p',draft.subhead,'art-subhead'));text.append(heading);
-    ['insight','idea','execution'].forEach(field=>{const section=node('section',undefined,'art-section');section.append(node('h3',field==='insight'&&!version.approved?'Suggested insight':LABELS[field]),node('p',draft[field]));text.append(section);});
-    const proof=node('section',undefined,`art-proof${draft.results?'':' missing'}`);proof.append(node('h3','Results'),node('p',draft.results||'Results to be confirmed.'));text.append(proof);content.append(visual,text);art.append(content);
+    const text=node('div',undefined,'art-text');const heading=node('div',undefined,'art-heading');heading.append(node('h1',draft.headline,'art-headline'),node('p',draft.subhead,'art-subhead'));heading.children[0].dataset.copyField='headline';heading.children[1].dataset.copyField='subhead';text.append(heading);
+    ['context','insight','idea','execution'].forEach(field=>{const section=node('section',undefined,'art-section');section.append(node('h3',field==='insight'&&!version.approved?'Insight · review':LABELS[field]),node('p',draft[field]||'Add your wording.'));section.lastChild.dataset.copyField=field;text.append(section);});
+    const proof=node('section',undefined,`art-proof${draft.results?'':' missing'}`);proof.append(node('h3','Results'),node('p',draft.results||'Results to be confirmed.'));proof.lastChild.dataset.copyField='results';text.append(proof);content.append(visual,text);art.append(content);
     const footer=node('div',undefined,'art-footer');footer.append(node('span',draft.brand||'Campaign board'));if(!version.approved)footer.append(node('span','DRAFT · FOR REVIEW','review-watermark'));art.append(footer);
+    art.querySelectorAll('[data-copy-field]').forEach(el=>{el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label','Edit '+LABELS[el.dataset.copyField]);el.addEventListener('click',()=>selectCopy(el.dataset.copyField));el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCopy(el.dataset.copyField);}});});
     if(window.BoardTypography)BoardTypography.fit(art,typographySettings());
     resize(); requestAnimationFrame(()=>{checkQuality();craft?.quality();});
     document.querySelectorAll('[data-layout]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.layout===version.layout)));
-    $('draft-state').textContent=version.approved?'Reviewed by you':'AI draft · Review needed';$('approve').checked=!!version.approved;
+    $('draft-state').textContent=version.approved?'Reviewed by you':(version.manual?'Manual draft · Review needed':'AI draft · Review needed');$('approve').checked=!!version.approved;
     $('image-fit').value=version.imageFit||'contain';$('image-position').value=version.imagePosition||'center';
   }
   function checkQuality() {
@@ -140,7 +141,7 @@
   function showReview() {
     const draft=current().draft;$('design-rationale').textContent=draft.rationale;
     $('applied-principles').replaceChildren(...draft.applied_principles.map(p=>node('li',p.rule)));
-    const evidence=$('campaign-evidence');evidence.replaceChildren(...['context','insight','idea','execution'].map(field=>node('li',`${LABELS[field]} · ${field==='insight'?'Interpretation for review':'AI wording from your brief'}: “${draft.support?.[field]||'No supporting detail supplied'}”`)));
+    const evidence=$('campaign-evidence');evidence.replaceChildren(...['context','insight','idea','execution'].map(field=>node('li',`${LABELS[field]} · ${current().manual?'Your wording':field==='insight'?'Interpretation for review':'AI wording from your brief'}: “${draft.support?.[field]||'No supporting detail supplied'}”`)));
     const gaps=[...draft.missing];if(state.heroSource?.kind==='generated')gaps.push('AI-generated concept image: do not present it as proof of real campaign execution.');if(!draft.results)gaps.push('Add supported results when they are available.');if(!state.hero)gaps.push('This is a typography-led draft. Add your own campaign image for more visual evidence.');
     $('review-gaps').replaceChildren(...[...new Set(gaps)].map(text=>node('li',text)));
   }
@@ -148,6 +149,24 @@
     const panel=$('copy-fields');panel.replaceChildren();
     COPY.forEach(field=>{const group=node('div');const label=node('label',LABELS[field]);label.htmlFor=`edit-${field}`;const input=node('textarea');input.id=`edit-${field}`;input.rows=field==='headline'?2:3;input.maxLength=field==='results'?550:field==='headline'?85:field==='subhead'?170:field==='execution'?340:280;input.value=current().draft[field];input.addEventListener('input',()=>{current().writing_events??=[];current().writing_events.push({field,action:'edited',at:new Date().toISOString()});current().draft[field]=input.value;current().approved=false;renderBoard();showReview();scheduleSave();});group.append(label,input);panel.append(group);});
   }
+  let selectedCopy = null;
+  function selectCopy(field) {
+    selectedCopy=field;$('selection-inspector').hidden=false;
+    $('selection-label').textContent=LABELS[field];$('selection-copy').value=current().draft[field];
+    $('selection-copy').maxLength=field==='results'?550:field==='headline'?85:field==='subhead'?170:field==='execution'?340:280;
+    $('selection-copy').focus();
+  }
+  $('close-selection').addEventListener('click',()=>{$('selection-inspector').hidden=true;selectedCopy=null;});
+  $('selection-copy').addEventListener('input',()=>{if(!current()||!selectedCopy)return;current().draft[selectedCopy]=$('selection-copy').value;current().approved=false;renderBoard();buildEditor();showReview();scheduleSave();});
+  $('start-manual').addEventListener('click',async()=>{
+    await craftReady;
+    const source=inputs();
+    const draft={brand:source.brand,campaign:source.campaign,color:source.color,headline:source.campaign||'Your campaign headline',subhead:'',context:'',insight:'',idea:'',execution:'',results:source.results,
+      missing:['Manual draft: add your approved campaign story and check every claim.'],applied_principles:[],rationale:'Manual editable composition. No AI writing request was made.',support:{},input_snapshot:source,layout:'impact',use_rag:false,rag_mode:'RAG-OFF',provenance:[]};
+    state.versions.push({draft,manual:true,layout:'impact',typography:{preset:'modern',scale:1,leading:1,tracking:0,spacing:1},approved:false,imageFit:'contain',imagePosition:'center',created:new Date().toISOString()});
+    state.current=state.versions.length-1;showVersion();$('copy-editor').open=true;await persist();
+    $('generation-status').textContent='Editable manual board ready. Your rough notes are preserved. Select any wording on the board to edit it.';
+  });
   function syncTypographyControls() { const settings=typographySettings();['preset','scale','leading','tracking','spacing'].forEach(key=>{const control=$(`type-${key}`);if(control)control.value=settings[key];}); }
   function showVersion() {
     $('empty-state').hidden=!!current();$('board-workspace').hidden=!current();
@@ -226,6 +245,9 @@
   $('apply-writing').addEventListener('click',()=>{if(!writeProposal)return;const {proposal,version,original}=writeProposal;if(current()!==version||version.draft[proposal.field]!==original){$('writing-status').textContent='This wording changed while the assistant was working. Request a fresh suggestion to keep your edits.';return;}version.draft[proposal.field]=proposal.proposed_text;version.approved=false;version.writing_history??=[];version.writing_events??=[];version.writing_events.push({field:proposal.field,action:'accepted',at:new Date().toISOString()});version.writing_history.push({field:proposal.field,before:original,after:proposal.proposed_text,evidence:proposal.evidence,action:'accepted',at:new Date().toISOString()});renderBoard();buildEditor();showReview();persist();$('writing-proposal').hidden=true;$('writing-status').textContent='Suggested wording applied. You can edit it further or restore the previous wording.';});
   $('reject-writing').addEventListener('click',()=>{if(writeProposal){writeProposal.version.writing_events??=[];writeProposal.version.writing_events.push({field:writeProposal.proposal.field,action:'rejected',at:new Date().toISOString()});persist();}$('writing-proposal').hidden=true;writeProposal=null;$('writing-status').textContent='Kept your existing wording.';});
   $('undo-writing').addEventListener('click',()=>{const version=current();const last=version?.writing_history?.at(-1);if(!last){$('writing-status').textContent='No accepted writing suggestion to undo.';return;}if(version.draft[last.field]!==last.after){$('writing-status').textContent='You edited this wording after applying the suggestion. Your newer changes are kept.';return;}version.draft[last.field]=last.before;version.writing_history.pop();version.approved=false;renderBoard();buildEditor();persist();$('writing-status').textContent='Previous wording restored.';});
+  $('design-heading').textContent='Campaign board';
+  $('design-heading').closest('.design-toolbar').after($('board-workspace'));
+  $('board-workspace').prepend(document.querySelector('.layout-bar'));
   craftReady=(async()=>{
     try{
       const saved=localStorage.getItem(STORAGE);
@@ -254,5 +276,5 @@
       btn.setAttribute('aria-label','Generate my board');
     }
   }
-  api('/api/status').then(status=>{aiAvailable=status.ai_available;setGenerateEnabled(aiAvailable, aiAvailable?'':'AI is not configured. Add API keys in .env to enable Generate.');$('generation-status').textContent=aiAvailable?'Ready when you are.':'Generate is disabled: AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{setGenerateEnabled(false, error.message);$('generation-status').textContent='Generate is disabled: '+error.message;});
+  api('/api/status').then(status=>{aiAvailable=status.ai_available;$('ask-writer').disabled=!aiAvailable;$('writing-status').textContent=aiAvailable?'Writing assistant connected.':'AI writing is not configured. Manual wording edits remain available.';setGenerateEnabled(aiAvailable, aiAvailable?'':'AI is not configured. Add API keys in .env to enable Generate.');$('generation-status').textContent=aiAvailable?'Ready when you are.':'Generate is disabled: AI is not configured. Your brief and manual edits will still be saved.';const coverage=status.learning||{};$('learning-status').textContent=`${(coverage.images_scanned||0).toLocaleString()} images scanned locally; ${coverage.ai_reviewed||0} boards studied visually by AI. ${status.principle_count||0} design principles and safeguards. The sample informs design; award level is not a guarantee of board quality.`;}).catch(error=>{setGenerateEnabled(false, error.message);$('generation-status').textContent='Generate is disabled: '+error.message;});
 })();
