@@ -86,10 +86,11 @@
     const scale = box.width / (board.offsetWidth || 1400);
     const footer = board.querySelector('.art-footer');
     const safeBottom = footer ? footer.getBoundingClientRect().top - 14 * scale : box.bottom - 45 * scale;
-    const nodes = board.querySelectorAll('.art-headline,.art-subhead,.art-section,.art-proof,.art-brand,.art-campaign');
+    const nodes = board.querySelectorAll('.art-headline,.art-subhead,.art-section,.art-proof,.art-brand,.art-campaign,[data-copy-field],.art-logo');
     nodes.forEach(node => {
       const rect = node.getBoundingClientRect();
-      const selector = `.${Array.from(node.classList).find(name => name.startsWith('art-'))}`;
+      const className = Array.from(node.classList).find(name => name.startsWith('art-'));
+      const selector = className ? `.${className}` : `[data-copy-field="${node.dataset.copyField}"]`;
       if (node.scrollWidth > node.clientWidth + 2) add('overflow', 'Text is wider than its column. Shorten a long word or choose another preset.', selector);
       if (rect.bottom > safeBottom + 2 * scale) add('overflow', 'Copy runs into the footer. Shorten the copy or use another layout.', selector);
       if (rect.left < box.left - scale || rect.right > box.right + scale) add('overflow', 'Text extends outside the board.', selector);
@@ -119,6 +120,21 @@
         }
       }
       if (!adjustments.length) adjustments.push('Headline reduced within its safe range; copy still needs attention.');
+    }
+    // Recover spacing only after display fitting, never silently reduce body readability
+    // or change the supplied campaign words to make an export look successful.
+    if (!result.ok && result.measurable) {
+      const text = board.querySelector('.art-text');
+      if (text && text.scrollHeight > text.clientHeight + 3) {
+        text.style.gap = '8px';
+        board.style.setProperty('--type-heading-gap', '10px');
+        board.querySelectorAll('.art-section h3,.art-proof h3').forEach(label => { label.style.marginBottom = '6px'; });
+        const proof = board.querySelector('.art-proof');
+        if (proof) proof.style.paddingTop = '8px';
+        result = inspect(board);
+        board.dataset.spacingFit = 'compact';
+        adjustments.push('Section spacing tightened to recover copy room. Body size and campaign wording unchanged.');
+      }
     }
     return { ...result, adjustments };
   }

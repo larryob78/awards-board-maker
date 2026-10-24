@@ -24,12 +24,25 @@ CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 def configured(config):
-    return bool(os.environ.get('RUNWAYML_API_SECRET') or os.environ.get('RUNWAY_API_KEY') or config.get('runway_secret_ref'))
+    return bool(os.environ.get('RUNWAYML_API_SECRET') or os.environ.get('RUNWAY_API_KEY') or config.get('runway_secret_ref') or config.get('runway_keychain_service'))
 
 
 def credential(config):
     ref = config.get('runway_secret_ref', '')
     key = os.environ.get('RUNWAYML_API_SECRET') or os.environ.get('RUNWAY_API_KEY')
+    service = config.get('runway_keychain_service')
+    if service:
+        account = config.get('runway_keychain_account', 'napkin')
+        if not all(isinstance(value, str) and 0 < len(value) <= 200 and not any(ord(c) < 32 for c in value) for value in (service, account)):
+            raise RuntimeError('The server Keychain reference is invalid. No image request was sent.')
+        try:
+            result = subprocess.run(['/usr/bin/security', 'find-generic-password', '-s', service, '-a', account, '-w'],
+                                    capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            raise RuntimeError('Keychain access could not be confirmed. Unlock this Mac and try again. No image request was sent.') from None
+        if result.returncode or not result.stdout.strip():
+            raise RuntimeError('Keychain could not supply the Runway key. Unlock this Mac and approve access. No image request was sent.')
+        return result.stdout.strip()
     if not ref and key:
         return key.strip()
     if not isinstance(ref, str) or not ref.startswith('op://'):

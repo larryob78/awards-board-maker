@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from image_engine import ImageJobs, MODEL, credential, download_image
+from image_engine import ImageJobs, MODEL, credential, download_image, configured
 
 
 class ImageTests(unittest.TestCase):
@@ -77,5 +77,35 @@ class ImageTests(unittest.TestCase):
         run.return_value.returncode=1;run.return_value.stderr='secret provider error';run.return_value.stdout=''
         with self.assertRaises(RuntimeError) as error:credential({'runway_secret_ref':'op://vault/item/key'})
         self.assertNotIn('secret provider error',str(error.exception))
+
+    @patch.dict('os.environ', {'RUNWAY_API_KEY': 'stale-key'}, clear=True)
+    @patch('image_engine.subprocess.run')
+    def test_explicit_keychain_reference_precedes_other_credentials(self, run):
+        run.return_value.returncode = 0
+        run.return_value.stdout = 'synthetic-keychain-secret\n'
+        config = {'runway_keychain_service': 'test-service', 'runway_keychain_account': 'napkin',
+                  'runway_secret_ref': 'op://vault/item/key'}
+        self.assertTrue(configured(config))
+        self.assertEqual(credential(config), 'synthetic-keychain-secret')
+        self.assertEqual(run.call_args.args[0], ['/usr/bin/security', 'find-generic-password',
+                         '-s', 'test-service', '-a', 'napkin', '-w'])
+        self.assertTrue(run.call_args.kwargs['capture_output'])
+
+    @patch.dict('os.environ', {}, clear=True)
+    @patch('image_engine.subprocess.run')
+    def test_keychain_failure_is_sanitized_and_never_falls_back(self, run):
+        run.return_value.returncode = 44
+        run.return_value.stdout = 'private-output'
+        run.return_value.stderr = 'private-diagnostic'
+        with self.assertRaises(RuntimeError) as result:
+            credential({'runway_keychain_service': 'test-service'})
+        self.assertNotIn('private', str(result.exception))
+        self.assertIn('No image request was sent', str(result.exception))
+
+    @patch('image_engine.subprocess.run')
+    def test_invalid_keychain_reference_rejected_without_secret_access(self, run):
+        with self.assertRaises(RuntimeError):
+            credential({'runway_keychain_service': 'bad\nservice'})
+        run.assert_not_called()
 
 if __name__=='__main__':unittest.main()
