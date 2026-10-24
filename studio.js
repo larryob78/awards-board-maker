@@ -125,8 +125,15 @@
     ['context','insight','idea','execution'].forEach(field=>{const section=node('section',undefined,'art-section');section.append(node('h3',field==='insight'&&!version.approved?'Insight · review':LABELS[field]),node('p',draft[field]||'Add your wording.'));section.lastChild.dataset.copyField=field;text.append(section);});
     const proof=node('section',undefined,`art-proof${draft.results?'':' missing'}`);proof.append(node('h3','Results'),node('p',draft.results||'Results to be confirmed.'));proof.lastChild.dataset.copyField='results';text.append(proof);content.append(visual,text);art.append(content);
     const footer=node('div',undefined,'art-footer');footer.append(node('span',draft.brand||'Campaign board'));if(!version.approved)footer.append(node('span','DRAFT · FOR REVIEW','review-watermark'));art.append(footer);
-    art.querySelectorAll('[data-copy-field]').forEach(el=>{el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label','Edit '+LABELS[el.dataset.copyField]);el.addEventListener('click',()=>selectCopy(el.dataset.copyField));el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCopy(el.dataset.copyField);}});});
+    art.querySelectorAll('[data-copy-field]').forEach(el=>{
+      el.tabIndex=0;el.contentEditable='plaintext-only';el.setAttribute('role','textbox');el.setAttribute('aria-multiline','true');el.setAttribute('aria-label','Edit '+LABELS[el.dataset.copyField]);
+      el.addEventListener('focus',()=>{if(selectedCopy!==el.dataset.copyField)selectCopy(el.dataset.copyField,false);});
+      el.addEventListener('input',()=>{const field=el.dataset.copyField;const limit=field==='headline'?85:field==='subhead'?170:field==='execution'?340:field==='results'?550:280;const value=el.textContent.slice(0,limit);if(el.textContent!==value)el.textContent=value;current().draft[field]=value;current().approved=false;$('approve').checked=false;$('draft-state').textContent='Edited · Review needed';$('selection-copy').value=value;buildEditor();showReview();scheduleSave();requestAnimationFrame(checkQuality);});
+      el.addEventListener('blur',()=>{checkQuality();});
+    });
     if(window.BoardTypography)BoardTypography.fit(art,typographySettings());
+    for(const [field,size] of Object.entries(version.typeSizes||{})){if(COPY.includes(field)&&Number.isFinite(size)&&size>=12&&size<=140){const el=art.querySelector('[data-copy-field="'+field+'"]');if(el)el.style.fontSize=size+'px';}}
+    const logo=art.querySelector('.art-logo');if(logo){logo.style.width=Math.max(40,Math.min(260,Number(state.logoWidth)||150))+'px';logo.style.height='auto';logo.style.maxHeight='64px';logo.style.objectFit='contain';logo.style.order=state.logoPlacement==='left'?'-1':'1';}
     resize(); requestAnimationFrame(()=>{checkQuality();craft?.quality();});
     document.querySelectorAll('[data-layout]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.layout===version.layout)));
     $('draft-state').textContent=version.approved?'Reviewed by you':(version.manual?'Manual draft · Review needed':'AI draft · Review needed');$('approve').checked=!!version.approved;
@@ -153,13 +160,17 @@
     const panel=$('copy-fields');panel.replaceChildren();
     COPY.forEach(field=>{const group=node('div');const label=node('label',LABELS[field]);label.htmlFor=`edit-${field}`;const input=node('textarea');input.id=`edit-${field}`;input.rows=field==='headline'?2:3;input.maxLength=field==='results'?550:field==='headline'?85:field==='subhead'?170:field==='execution'?340:280;input.value=current().draft[field];input.addEventListener('input',()=>{current().writing_events??=[];current().writing_events.push({field,action:'edited',at:new Date().toISOString()});current().draft[field]=input.value;current().approved=false;renderBoard();showReview();scheduleSave();});group.append(label,input);panel.append(group);});
   }
+  const editUndo=[];
+  function checkpoint(){if(!current())return;editUndo.push({version:current(),draft:structuredClone(current().draft),typeSizes:{...current().typeSizes},logo:state.logo,logoPlacement:state.logoPlacement||'right',logoWidth:state.logoWidth||150});if(editUndo.length>30)editUndo.shift();}
+  function undoBoard(){const before=editUndo.pop();if(!before)return;const version=before.version;if(!state.versions.includes(version))return;version.draft=before.draft;version.typeSizes=before.typeSizes;state.logo=before.logo;state.logoPlacement=before.logoPlacement;state.logoWidth=before.logoWidth;version.approved=false;renderBoard();buildEditor();showReview();persist();if(selectedCopy){$('selection-copy').value=current().draft[selectedCopy];}}
   let selectedCopy = null;
-  function selectCopy(field) {
+  function selectCopy(field,focus=true) {
+    checkpoint();
     selectedCopy=field;$('selection-inspector').hidden=false;
     $('selection-label').textContent=LABELS[field];$('selection-copy').value=current().draft[field];
     $('copy-editor').hidden=true;
     $('selection-copy').maxLength=field==='results'?550:field==='headline'?85:field==='subhead'?170:field==='execution'?340:280;
-    openTool('story');$('selection-inspector').hidden=false;$('selection-copy').focus();
+    openTool('type');$('selection-inspector').hidden=false;const selected=$('board-art').querySelector('[data-copy-field="'+field+'"]');$('selected-type-size').value=Math.round(current().typeSizes?.[field]||parseFloat(selected?getComputedStyle(selected).fontSize:24));if(focus)$('selection-copy').focus();
   }
   $('close-selection').addEventListener('click',()=>{$('selection-inspector').hidden=true;$('copy-editor').hidden=false;selectedCopy=null;});
   $('selection-copy').addEventListener('input',()=>{if(!current()||!selectedCopy)return;current().draft[selectedCopy]=$('selection-copy').value;current().approved=false;renderBoard();buildEditor();showReview();scheduleSave();});
@@ -174,6 +185,7 @@
   });
   function syncTypographyControls() { const settings=typographySettings();['preset','scale','leading','tracking','spacing'].forEach(key=>{const control=$(`type-${key}`);if(control)control.value=settings[key];}); }
   function showVersion() {
+    selectedCopy=null;$('selection-inspector').hidden=true;$('copy-editor').hidden=false;
     $('empty-state').hidden=!!current();$('board-workspace').hidden=!current();
     if(!current())return;
     $('version-select').replaceChildren(...state.versions.map((v,i)=>{const option=node('option',`Draft ${i+1}`);option.value=i;return option;}));$('version-select').value=state.current;
@@ -188,8 +200,8 @@
         const byteLimit=name==='hero'?84_000_000:8_000_000;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>byteLimit)throw new Error(`Choose a PNG, JPG or WebP image under ${byteLimit/1_000_000} MB.`);
         await craftReady;const data=await fileData(file);const img=new Image();img.src=data;await img.decode();if(projectChanging||state!==origin)throw new Error('The project changed during upload. Its newer images were preserved; select the file again in the intended project.');
         if(name==='hero'){ImageCraft.dimensions(img.naturalWidth,img.naturalHeight);await craft.attach(data,{},'Uploaded original');}
-        else {if(img.width*img.height>40_000_000)throw new Error('Choose a logo smaller than 40 megapixels.');state.logo=data;if(current())current().approved=false;$('remove-logo').hidden=false;renderBoard();await persist();}
-      }catch(error){$('save-status').textContent=error.message;}
+        else {checkpoint();if(img.width*img.height>40_000_000)throw new Error('Choose a logo smaller than 40 megapixels.');state.logo=data;state.logoPlacement??='right';state.logoWidth??=150;if(current())current().approved=false;$('remove-logo').hidden=false;renderBoard();await persist();$('logo-upload-status').textContent='Logo added. Original image retained in this project.';}
+      }catch(error){$('save-status').textContent=error.message;$('logo-upload-status').textContent=error.message;}
       event.target.value='';
     });
     $(`remove-${name}`).addEventListener('click',async()=>{try{await craftReady;if(name==='hero'){await craft.clearSource();state.heroSource=null;}state[name]='';$(`${name}-upload`).value='';$(`remove-${name}`).hidden=true;if(current())current().approved=false;renderBoard();if(current())showReview();await persist();}catch(error){$('save-status').textContent=error.message;}});
@@ -257,7 +269,7 @@
   const saved=node('span','Browser draft · checking…','saved-indicator');saved.id='circle-save-state';
   const files=node('button','File');files.type='button';files.className='circle-file';
   const example=node('a','Fictional example');example.href='?example=1';example.className='example-link';
-  header.append(brand,title,saved,example,files);
+  const undo=node('button','Undo');undo.type='button';undo.className='circle-file';undo.addEventListener('click',undoBoard);header.append(brand,title,saved,example,undo,files);
   const rail=node('nav',undefined,'circle-rail');rail.setAttribute('aria-label','Board tools');
   const drawer=node('aside',undefined,'circle-drawer');drawer.hidden=true;
   const drawerHead=node('div',undefined,'drawer-heading');const drawerTitle=node('h2','Story');const close=node('button','Close');close.type='button';drawerHead.append(drawerTitle,close);drawer.append(drawerHead);
@@ -267,8 +279,14 @@
     if(key!=='file'){const button=node('button',undefined,'circle-tool');button.type='button';button.dataset.tool=key;button.setAttribute('aria-label',label);button.append(node('span',key==='story'?'Aa':key==='image'?'▧':'T','circle-tool-disc'),node('span',label));button.addEventListener('click',()=>openTool(key));rail.append(button);}
   }
   function move(selector,target){const el=document.querySelector(selector);if(el)target.append(el);}
-  move('#selection-inspector',groups.story);move('#copy-editor',groups.story);move('.writing-panel',groups.story);
-  const assets=document.querySelector('.asset-fields');groups.image.append(assets);move('#image-craft-panel',groups.image);move('.refine-bar',groups.image);
+  move('#selection-inspector',groups.type);move('#copy-editor',groups.story);move('.writing-panel',groups.story);
+  const typeSizeLabel=node('label','Size');const selectedSize=node('input');selectedSize.id='selected-type-size';selectedSize.type='number';selectedSize.min='12';selectedSize.max='140';selectedSize.step='1';typeSizeLabel.append(selectedSize);$('selection-inspector').append(typeSizeLabel);selectedSize.addEventListener('change',()=>{if(!current()||!selectedCopy)return;checkpoint();current().typeSizes??={};current().typeSizes[selectedCopy]=Math.max(12,Math.min(140,Number(selectedSize.value)||24));current().approved=false;renderBoard();scheduleSave();});
+  const assets=document.querySelector('.asset-fields');groups.image.append(assets);const logoArea=$('logo-upload').parentElement;logoArea.querySelector('label').textContent='Add your logo';const formatNote=node('p','PNG, JPG or WebP · up to 8 MB. For SVG, export a PNG first.','logo-format-note');logoArea.append(formatNote);const logoStatus=node('p','','status');logoStatus.id='logo-upload-status';logoStatus.setAttribute('role','status');logoArea.append(logoStatus);const placeLabel=node('label','Logo position');const place=node('select');place.id='logo-position';for(const [value,label] of [['left','Top left'],['right','Top right']]){const option=node('option',label);option.value=value;place.append(option);}placeLabel.append(place);logoArea.append(placeLabel);place.addEventListener('change',()=>{checkpoint();state.logoPlacement=place.value;if(current())current().approved=false;renderBoard();persist();});const logoSizeLabel=node('label','Logo width');const logoSize=node('input');logoSize.type='range';logoSize.min='40';logoSize.max='260';logoSize.value=String(state.logoWidth||150);logoSizeLabel.append(logoSize);logoArea.append(logoSizeLabel);logoSize.addEventListener('change',()=>{checkpoint();state.logoWidth=Number(logoSize.value);if(current())current().approved=false;renderBoard();persist();});move('#image-craft-panel',groups.image);move('.refine-bar',groups.image);
+  const imageDetails=node('details',undefined,'image-request-details');imageDetails.append(node('summary','Image settings and request details'));
+  for(const id of ['image-source-label','image-quality','image-prompt-count','image-transfer','image-cost']){const el=$(id);if(el)imageDetails.append(el);}
+  for(const id of ['image-model','image-ratio']){const el=$(id);if(el)imageDetails.append(el.closest('label'));}
+  document.querySelector('.craft-controls').append(imageDetails);
+  document.querySelectorAll('#image-craft-panel .privacy-note').forEach(el=>{if(!imageDetails.contains(el))imageDetails.append(el);});
   move('.layout-bar',groups.type);move('.type-panel',groups.type);
   move('.project-tools',groups.file);move('#save-status',groups.file);move('#save-links',groups.file);move('.export-bar',groups.file);move('#export-status',groups.file);move('#download-links',groups.file);move('.review-panel',groups.file);
   const advanced=node('details');advanced.append(node('summary','Campaign notes and connections'));advanced.append(document.querySelector('.brief-panel'));groups.story.append(advanced);
@@ -291,15 +309,15 @@
   }
   craftReady=(async()=>{
     try{
-      const saved=localStorage.getItem(POINTER);
-      if(saved){const pointer=JSON.parse(saved);const stored=pointer.largeAssetsInDB?await ImageCraft.storage.get(BOARD_KEY):pointer;if(!stored)throw new Error('The local image database is missing. Open a saved project to recover its assets.');state=validateProject(stored);}
+      const savedPointer=localStorage.getItem(POINTER);
+      if(savedPointer){const pointer=JSON.parse(savedPointer);const stored=pointer.largeAssetsInDB?await ImageCraft.storage.get(BOARD_KEY):pointer;if(!stored)throw new Error('The local image database is missing. Open a saved project to recover its assets.');state=validateProject(stored);}
       craft=await ImageCraft.mount({api,
         apply:async(image,source)=>{state.hero=image;state.heroSource=source;state.imageCraftId=craft.getProjectId();state.versions.forEach(v=>v.approved=false);$('remove-hero').hidden=false;renderBoard();if(current())showReview();await persist();},
         placement:()=>{const img=$('board-art').querySelector('.art-visual img');return img?{width:img.clientWidth,height:img.clientHeight,fit:current()?.imageFit||'contain'}:null;}
       });
       const recoverLegacy=!state.imageCraftId;state.imageCraftId=await craft.init(state.imageCraftId,state.hero,state.heroSource,recoverLegacy);
       const recovered=ImageCraft.reconcileHero(state,await craft.currentImage());state=recovered.state;
-      restoreInputs();await installFont();showVersion();restoring=false;if((EXAMPLE||!saved)&&!current())await createExample();await persist();saved.textContent='Browser draft · saved locally';if(recovered.changed)$('image-status').textContent='Recovered the saved image revision and reset board approval for review. Original images and history are preserved.';
+      restoreInputs();await installFont();showVersion();restoring=false;if((EXAMPLE||!savedPointer)&&!current())await createExample();await persist();saved.textContent='Browser draft · saved locally';if(recovered.changed)$('image-status').textContent='Recovered the saved image revision and reset board approval for review. Original images and history are preserved.';
     }catch(error){restoring=false;$('save-status').textContent=error.message;$('image-status').textContent=error.message;throw error;}
   })();craftReady.catch(()=>{});
   new ResizeObserver(resize).observe($('board-fit'));
