@@ -1,4 +1,5 @@
 """Local reference retrieval and image-grounded guidance for Awards Board Maker."""
+from export_preflight import encode_candidates
 import argparse
 import base64
 from collections import Counter
@@ -269,11 +270,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_data(502, {'error': str(error)})
             except Exception:
                 return self.send_data(502, {'error': 'Image status unavailable. Your task is retained.'})
-        download = re.fullmatch(r'/api/download/([a-f0-9]{32})\.(png|pdf|json)', path)
+        download = re.fullmatch(r'/api/download/([a-f0-9]{32})\.(png|pdf|json|jpg)', path)
         if download:
             saved = ROOT / 'reference-data' / 'exports' / f'{download[1]}.{download[2]}'
             if saved.is_file():
-                mime = {'png': 'image/png', 'pdf': 'application/pdf', 'json': 'application/octet-stream'}[download[2]]
+                mime = {'png': 'image/png', 'pdf': 'application/pdf', 'json': 'application/octet-stream', 'jpg': 'image/jpeg'}[download[2]]
                 return self.send_data(200, saved.read_bytes(), mime)
             return self.send_data(404, {'error': 'Saved file not found.'})
         match = re.fullmatch(r'/api/boards/(\d+)/(thumbnail|image)', path)
@@ -304,12 +305,42 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get('Content-Length', '0'))
             # A 20 MP lossless RGBA source can approach 84 MB; its base64 form
             # plus an 8 MB selection mask needs a larger bound than board export.
-            maximum = 125_000_000 if self.path == '/api/create-image' else 30_000_000 if self.path == '/api/export' else 40000
+            maximum = 125_000_000 if self.path in {'/api/create-image', '/api/export-cannes'} else 30_000_000 if self.path == '/api/export' else 40000
             if not 0 < length <= maximum:
                 raise ValueError('Request is too large or empty.')
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
                 raise ValueError('Expected a JSON object.')
+            if self.path == '/api/export-cannes':
+                encoded = data.get('data')
+                if not isinstance(encoded, str):
+                    raise ValueError('Missing rendered board PNG.')
+                try:
+                    png = base64.b64decode(encoded, validate=True)
+                except ValueError:
+                    raise ValueError('Invalid rendered board data.') from None
+                if not png or len(png) > 84_000_000:
+                    raise ValueError('The rendered PNG must be under 84 MB.')
+                candidates = encode_candidates(png)
+                directory = ROOT / 'reference-data' / 'exports'
+                directory.mkdir(parents=True, exist_ok=True)
+                export_id = uuid.uuid4().hex
+                (directory / (export_id + '.png')).write_bytes(png)
+                attempts = []
+                for raw, report in candidates:
+                    name = uuid.uuid4().hex + '.jpg'
+                    (directory / name).write_bytes(raw)
+                    attempts.append(dict(report, url='/api/download/' + name))
+                chosen = next((report for report in attempts if report['technical_pass']), None)
+                result = {'technical_pass': bool(chosen), 'selected': chosen, 'attempts': attempts,
+                          'original_png': '/api/download/' + export_id + '.png',
+                          'visual_review': 'Not checked', 'category_applicability': 'Not checked',
+                          'source_board_hash': data.get('source_board_hash') if isinstance(data.get('source_board_hash'), str) and re.fullmatch(r'[a-f0-9]{64}', data['source_board_hash']) else None,
+                          'message': 'Technical file checks passed. Review the actual JPEG and category rules before entry.' if chosen else
+                          'No compliant JPEG after the bounded encode checks. Inspect the byte count: supply a more detailed original if below 5 MB, or simplify image content if above 15 MB. No padding or invented detail was added.'}
+                (directory / (export_id + '.json')).write_text(json.dumps(result, indent=2))
+                result['report_url'] = '/api/download/' + export_id + '.json'
+                return self.send_data(200, result)
             if self.path == '/api/export':
                 kind = data.get('format')
                 encoded = data.get('data')
